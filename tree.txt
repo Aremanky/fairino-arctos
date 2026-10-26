@@ -1,34 +1,4 @@
 .
-├── arctos_description-main
-│   └── arctos_urdf_description
-│       ├── launch
-│       │   ├── controller.launch
-│       │   ├── controller.yaml
-│       │   ├── display.launch
-│       │   ├── gazebo.launch
-│       │   └── urdf.rviz
-│       ├── meshes
-│       │   ├── base_link.stl
-│       │   ├── Gripper_1.stl
-│       │   ├── Left_jaw_1.stl
-│       │   ├── Link_1_1.stl
-│       │   ├── Link_2_1.stl
-│       │   ├── Link_3_1.stl
-│       │   ├── Link_4_1.stl
-│       │   ├── Link_5_1.stl
-│       │   ├── Link_6_1.stl
-│       │   └── Right_jaw_1.stl
-│       └── urdf
-│           ├── arctos_mjcf.xml
-│           ├── arctos.urdf
-│           ├── arctos_urdf.gazebo
-│           ├── arctos_urdf.trans
-│           ├── arctos_urdf.xacro
-│           ├── convertir_arctos.py
-│           ├── escena_taladro.xml
-│           ├── materials.xacro
-│           ├── mesa_trabajo.xml
-│           └── scene_arctos.xml
 ├── arrancar_nivel6.sh
 ├── calibrador_hsv.py
 ├── calibrar_extrinseca.py
@@ -36,6 +6,7 @@
 ├── camaras_extrinsecas.json
 ├── comprobar_profundidad.py
 ├── config.py
+├── config.py.bak_antes_mover
 ├── episodios
 │   ├── abrir_fusible
 │   │   ├── episodio_0001.csv
@@ -75,6 +46,209 @@
 │   │   └── episodio_0010.csv
 │   └── tornillo
 │       └── episodio_0001.csv
+├── fairino_description
+│   ├── meshes
+│   │   ├── base_link.STL
+│   │   ├── col_shoulder.stl
+│   │   ├── forearm_Link.STL
+│   │   ├── shoulder_Link.STL
+│   │   ├── upperarm_Link.STL
+│   │   ├── vis_base_0.stl
+│   │   ├── vis_base_1.stl
+│   │   ├── vis_base_2.stl
+│   │   ├── vis_forearm_0.stl
+│   │   ├── vis_forearm_1.stl
+│   │   ├── vis_forearm_2.stl
+│   │   ├── vis_forearm_3.stl
+│   │   ├── vis_forearm_4.stl
+│   │   ├── vis_forearm_5.stl
+│   │   ├── vis_forearm_6.stl
+│   │   ├── vis_shoulder_0.stl
+│   │   ├── vis_shoulder_1.stl
+│   │   ├── vis_shoulder_2.stl
+│   │   ├── vis_shoulder_3.stl
+│   │   ├── vis_shoulder_4.stl
+│   │   ├── vis_upperarm_0.stl
+│   │   ├── vis_upperarm_1.stl
+│   │   ├── vis_upperarm_2.stl
+│   │   ├── vis_upperarm_3.stl
+│   │   ├── vis_upperarm_4.stl
+│   │   ├── vis_upperarm_5.stl
+│   │   ├── vis_upperarm_6.stl
+│   │   ├── vis_wrist1_0.stl
+│   │   ├── vis_wrist1_1.stl
+│   │   ├── vis_wrist1_2.stl
+│   │   ├── vis_wrist1_3.stl
+│   │   ├── vis_wrist1_4.stl
+│   │   ├── vis_wrist2_0.stl
+│   │   ├── vis_wrist2_1.stl
+│   │   ├── vis_wrist2_2.stl
+│   │   ├── vis_wrist2_3.stl
+│   │   ├── vis_wrist2_4.stl
+│   │   ├── vis_wrist3_0.stl
+│   │   ├── vis_wrist3_1.stl
+│   │   ├── vis_wrist3_2.stl
+│   │   ├── wrist1_Link.STL
+│   │   ├── wrist2_Link.STL
+│   │   └── wrist3_Link.STL
+│   └── mjcf
+│       ├── decoracion
+│       │   ├── deco_assets.xml
+│       │   ├── deco_escena_base.xml
+│       │   ├── deco_mesa.xml
+│       │   ├── deco_taladro_peana.xml
+│       │   ├── deco_taladro_techo.xml
+│       │   ├── LEEME.md
+│       │   └── texturas
+│       │       ├── cinta_seguridad.png
+│       │       ├── panel_perforado.png
+│       │       ├── rotulo_skill_shield.png
+│       │       └── rotulo_taller.png
+│       ├── escena_taladro.xml
+│       ├── fairino_mjcf.xml
+│       └── mesa_trabajo.xml
+├── fr5_mujoco
+│   ├── escena_fr5.xml
+│   ├── fr5_limpio.urdf
+│   ├── fr5.xml
+│   ├── meshes
+│   │   ├── base_link.STL
+│   │   ├── col_shoulder.stl
+│   │   ├── forearm_Link.STL
+│   │   ├── shoulder_Link.STL
+│   │   ├── upperarm_Link.STL
+│   │   ├── vis_base_0.stl
+│   │   ├── vis_base_1.stl
+│   │   ├── vis_base_2.stl
+│   │   ├── vis_forearm_0.stl
+│   │   ├── vis_forearm_1.stl
+│   │   ├── vis_forearm_2.stl
+│   │   ├── vis_forearm_3.stl
+│   │   ├── vis_forearm_4.stl
+│   │   ├── vis_forearm_5.stl
+│   │   ├── vis_forearm_6.stl
+│   │   ├── vis_shoulder_0.stl
+│   │   ├── vis_shoulder_1.stl
+│   │   ├── vis_shoulder_2.stl
+│   │   ├── vis_shoulder_3.stl
+│   │   ├── vis_shoulder_4.stl
+│   │   ├── vis_upperarm_0.stl
+│   │   ├── vis_upperarm_1.stl
+│   │   ├── vis_upperarm_2.stl
+│   │   ├── vis_upperarm_3.stl
+│   │   ├── vis_upperarm_4.stl
+│   │   ├── vis_upperarm_5.stl
+│   │   ├── vis_upperarm_6.stl
+│   │   ├── vis_wrist1_0.stl
+│   │   ├── vis_wrist1_1.stl
+│   │   ├── vis_wrist1_2.stl
+│   │   ├── vis_wrist1_3.stl
+│   │   ├── vis_wrist1_4.stl
+│   │   ├── vis_wrist2_0.stl
+│   │   ├── vis_wrist2_1.stl
+│   │   ├── vis_wrist2_2.stl
+│   │   ├── vis_wrist2_3.stl
+│   │   ├── vis_wrist2_4.stl
+│   │   ├── vis_wrist3_0.stl
+│   │   ├── vis_wrist3_1.stl
+│   │   ├── vis_wrist3_2.stl
+│   │   ├── wrist1_Link.STL
+│   │   ├── wrist2_Link.STL
+│   │   └── wrist3_Link.STL
+│   └── visuales.json
+├── FR5_Reinforcement-learning
+│   ├── figure
+│   │   ├── real.jpg
+│   │   └── sim.jpg
+│   ├── fr5_description
+│   │   ├── CMakeLists.txt
+│   │   ├── launch
+│   │   │   ├── fr5robot.rviz
+│   │   │   └── fr5robot_rviz.launch
+│   │   ├── meshes
+│   │   │   ├── base_link.STL
+│   │   │   ├── collision
+│   │   │   │   ├── base_link.STL
+│   │   │   │   ├── forearm_Link.STL
+│   │   │   │   ├── shoulder_Link.STL
+│   │   │   │   ├── upperarm_Link.STL
+│   │   │   │   ├── wrist1_Link.STL
+│   │   │   │   ├── wrist2_Link.STL
+│   │   │   │   └── wrist3_Link.STL
+│   │   │   ├── finger_link1.STL
+│   │   │   ├── finger_link2.STL
+│   │   │   ├── fr5v6
+│   │   │   │   ├── collision
+│   │   │   │   │   ├── base_link.STL
+│   │   │   │   │   ├── j1_Link.STL
+│   │   │   │   │   ├── j2_Link.STL
+│   │   │   │   │   ├── j3_Link.STL
+│   │   │   │   │   ├── j4_Link.STL
+│   │   │   │   │   ├── j5_Link.STL
+│   │   │   │   │   └── j6_Link.STL
+│   │   │   │   └── visual
+│   │   │   │       ├── base_link.DAE
+│   │   │   │       ├── j1_Link.DAE
+│   │   │   │       ├── j2_Link.DAE
+│   │   │   │       ├── j3_Link.DAE
+│   │   │   │       ├── j4_Link.DAE
+│   │   │   │       ├── j5_Link.DAE
+│   │   │   │       └── j6_Link.DAE
+│   │   │   ├── hand_base_link.STL
+│   │   │   ├── handlink1.STL
+│   │   │   ├── handlink2.STL
+│   │   │   ├── handlink3.STL
+│   │   │   └── visual
+│   │   │       ├── base.dae
+│   │   │       ├── forearm.dae
+│   │   │       ├── shoulder.dae
+│   │   │       ├── upperarm.dae
+│   │   │       ├── wrist1.dae
+│   │   │       ├── wrist2.dae
+│   │   │       └── wrist3.dae
+│   │   ├── package.xml
+│   │   └── urdf
+│   │       ├── 3D图.urdf
+│   │       ├── box.urdf
+│   │       ├── fr5_gazebo.urdf
+│   │       ├── fr5_robot.urdf
+│   │       ├── fr5v6.urdf
+│   │       ├── fr5_withgripper.urdf
+│   │       └── new_gripper.urdf
+│   ├── FR_Gym
+│   │   ├── Callback.py
+│   │   ├── Fr5_env.py
+│   │   ├── Fr5_train.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── Callback.cpython-310.pyc
+│   │   │   ├── Fr5_env.cpython-310.pyc
+│   │   │   └── reward.cpython-310.pyc
+│   │   ├── reward.py
+│   │   └── test
+│   │       ├── Fr5_test.py
+│   │       └── __init__.py
+│   ├── LICENSE
+│   ├── logs
+│   │   └── PPO
+│   │       └── 0904-123116
+│   │           ├── evaluations.npz
+│   │           ├── events.out.tfevents.1725424283.wzy-709.23780.0
+│   │           ├── monitor.csv
+│   │           └── progress.csv
+│   ├── models
+│   │   └── PPO
+│   │       └── best_model.zip
+│   ├── README_cn.md
+│   ├── README.md
+│   ├── requirments.txt
+│   ├── utils
+│   │   ├── arguments.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── arguments.cpython-310.pyc
+│   │       └── arguments.cpython-39.pyc
+│   └── visualShapeBench.json_0.json
 ├── hand_landmark_lite_sh4.blob
 ├── manus_calibracion.json
 ├── MANUS_Core_3.2.1_SDK_Linux
@@ -952,7 +1126,14 @@
 │   │   │   ├── feetech_client.py
 │   │   │   ├── __init__.py
 │   │   │   ├── mock_dynamixel_client.py
-│   │   │   └── motor_client.py
+│   │   │   ├── motor_client.py
+│   │   │   └── __pycache__
+│   │   │       ├── dynamixel_client.cpython-312.pyc
+│   │   │       ├── dynamixel_client.cpython-313.pyc
+│   │   │       ├── __init__.cpython-312.pyc
+│   │   │       ├── __init__.cpython-313.pyc
+│   │   │       ├── motor_client.cpython-312.pyc
+│   │   │       └── motor_client.cpython-313.pyc
 │   │   ├── hardware_hand.py
 │   │   ├── __init__.py
 │   │   ├── joint_position.py
@@ -976,8 +1157,30 @@
 │   │   │       │   └── config.yaml
 │   │   │       └── orcahand_touch_right
 │   │   │           └── config.yaml
+│   │   ├── __pycache__
+│   │   │   ├── base_hand.cpython-312.pyc
+│   │   │   ├── base_hand.cpython-313.pyc
+│   │   │   ├── calibration.cpython-312.pyc
+│   │   │   ├── calibration.cpython-313.pyc
+│   │   │   ├── constants.cpython-312.pyc
+│   │   │   ├── constants.cpython-313.pyc
+│   │   │   ├── hand_config.cpython-312.pyc
+│   │   │   ├── hand_config.cpython-313.pyc
+│   │   │   ├── hardware_hand.cpython-312.pyc
+│   │   │   ├── hardware_hand.cpython-313.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── joint_position.cpython-312.pyc
+│   │   │   ├── joint_position.cpython-313.pyc
+│   │   │   ├── version.cpython-312.pyc
+│   │   │   └── version.cpython-313.pyc
 │   │   ├── utils
 │   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-313.pyc
+│   │   │   │   ├── utils.cpython-312.pyc
+│   │   │   │   └── utils.cpython-313.pyc
 │   │   │   └── utils.py
 │   │   └── version.py
 │   ├── pyproject.toml
@@ -1022,6 +1225,299 @@
 │   │   ├── test_model_dispatch.py
 │   │   ├── test_tension.py
 │   │   └── test_yaml.py
+│   └── uv.lock
+├── orca_core_touch
+│   ├── CLAUDE.md
+│   ├── docs
+│   │   ├── auto_docs_instructions.md
+│   │   ├── css
+│   │   │   └── overrides.css
+│   │   ├── img
+│   │   │   └── logo-light-256.png
+│   │   ├── index.md
+│   │   ├── pages
+│   │   │   ├── getting-started-docs
+│   │   │   │   ├── initial-tensioning-and-calibration.md
+│   │   │   │   ├── quickstart-with-core-package.md
+│   │   │   │   ├── setting-up-config.md
+│   │   │   │   ├── setting-up-dynamixels.md
+│   │   │   │   └── windows.md
+│   │   │   └── orca-core-docs
+│   │   │       ├── latency-optimization.md
+│   │   │       ├── motor-client-api.md
+│   │   │       ├── orca-core-scripts.md
+│   │   │       ├── orca-core-structure.md
+│   │   │       ├── orcahand-api.md
+│   │   │       └── tactile-frames.md
+│   │   └── requirements.txt
+│   ├── examples
+│   │   ├── demo_runner.py
+│   │   ├── main_demo_abduction.py
+│   │   ├── main_demo.py
+│   │   ├── record_angles.py
+│   │   ├── record_continuous.py
+│   │   ├── replay_angles.py
+│   │   ├── replay_continuous.py
+│   │   ├── sequences
+│   │   │   └── kapandji_opposition.yaml
+│   │   └── taxel_frames.py
+│   ├── LICENSE
+│   ├── mkdocs.yml
+│   ├── orca_core
+│   │   ├── api
+│   │   │   ├── api.py
+│   │   │   └── __init__.py
+│   │   ├── base_hand.py
+│   │   ├── calibration.py
+│   │   ├── constants.py
+│   │   ├── control
+│   │   │   ├── constants.py
+│   │   │   ├── __init__.py
+│   │   │   ├── joint_controller.py
+│   │   │   ├── joint_loop.py
+│   │   │   └── __pycache__
+│   │   │       ├── constants.cpython-312.pyc
+│   │   │       ├── __init__.cpython-312.pyc
+│   │   │       ├── joint_controller.cpython-312.pyc
+│   │   │       └── joint_loop.cpython-312.pyc
+│   │   ├── data
+│   │   │   └── demo_poses.yaml
+│   │   ├── demo_poses.py
+│   │   ├── hand_config.py
+│   │   ├── hand_factory.py
+│   │   ├── hardware
+│   │   │   ├── config_registers.py
+│   │   │   ├── dynamixel_client.py
+│   │   │   ├── feetech
+│   │   │   │   ├── group_sync_read.py
+│   │   │   │   ├── group_sync_write.py
+│   │   │   │   ├── hls.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── port_handler.py
+│   │   │   │   ├── protocol_packet_handler.py
+│   │   │   │   ├── scscl.py
+│   │   │   │   ├── scservo_def.py
+│   │   │   │   └── sms_sts.py
+│   │   │   ├── feetech_client.py
+│   │   │   ├── feetech_registers.py
+│   │   │   ├── hand_serial_link.py
+│   │   │   ├── __init__.py
+│   │   │   ├── joint_encoder_client.py
+│   │   │   ├── mock_dynamixel_client.py
+│   │   │   ├── mock_feetech_client.py
+│   │   │   ├── mock_hand_serial_link.py
+│   │   │   ├── motor_client.py
+│   │   │   ├── motor_factory.py
+│   │   │   ├── motor_resolution.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── hand_serial_link.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── joint_encoder_client.cpython-312.pyc
+│   │   │   │   ├── motor_client.cpython-312.pyc
+│   │   │   │   ├── motor_factory.cpython-312.pyc
+│   │   │   │   ├── motor_resolution.cpython-312.pyc
+│   │   │   │   └── tactile_client.cpython-312.pyc
+│   │   │   ├── sensing
+│   │   │   │   ├── constants.py
+│   │   │   │   ├── encoder_filter.py
+│   │   │   │   ├── encoder_protocol.py
+│   │   │   │   ├── framing.py
+│   │   │   │   ├── health.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── models
+│   │   │   │   │   ├── touch-sensor-finger
+│   │   │   │   │   │   └── config.yaml
+│   │   │   │   │   ├── touch-sensor-pinky
+│   │   │   │   │   │   └── config.yaml
+│   │   │   │   │   └── touch-sensor-thumb
+│   │   │   │   │       └── config.yaml
+│   │   │   │   ├── __pycache__
+│   │   │   │   │   ├── constants.cpython-312.pyc
+│   │   │   │   │   ├── encoder_filter.cpython-312.pyc
+│   │   │   │   │   ├── encoder_protocol.cpython-312.pyc
+│   │   │   │   │   ├── framing.cpython-312.pyc
+│   │   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   │   ├── serial_discovery.cpython-312.pyc
+│   │   │   │   │   ├── tactile_protocol.cpython-312.pyc
+│   │   │   │   │   ├── taxel_geometry.cpython-312.pyc
+│   │   │   │   │   └── types.cpython-312.pyc
+│   │   │   │   ├── serial_discovery.py
+│   │   │   │   ├── tactile_mock.py
+│   │   │   │   ├── tactile_protocol.py
+│   │   │   │   ├── taxel_geometry.py
+│   │   │   │   └── types.py
+│   │   │   └── tactile_client.py
+│   │   ├── hardware_hand.py
+│   │   ├── hardware_hand_sensing.py
+│   │   ├── __init__.py
+│   │   ├── joint_position.py
+│   │   ├── kinematics
+│   │   │   ├── data
+│   │   │   │   └── v2_kinematics.yaml
+│   │   │   ├── frames.py
+│   │   │   ├── hand_kinematics.py
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── frames.cpython-312.pyc
+│   │   │   │   ├── hand_kinematics.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   └── transforms.cpython-312.pyc
+│   │   │   └── transforms.py
+│   │   ├── maintenance
+│   │   │   ├── calibration_routine.py
+│   │   │   ├── guided_tension.py
+│   │   │   ├── __init__.py
+│   │   │   ├── motor_chain.py
+│   │   │   ├── motor_reads.py
+│   │   │   ├── motor_travel.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── calibration_routine.cpython-312.pyc
+│   │   │   │   ├── guided_tension.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── motor_chain.cpython-312.pyc
+│   │   │   │   ├── motor_reads.cpython-312.pyc
+│   │   │   │   ├── motor_travel.cpython-312.pyc
+│   │   │   │   └── tensioning.cpython-312.pyc
+│   │   │   └── tensioning.py
+│   │   ├── models
+│   │   │   ├── v1
+│   │   │   │   ├── orcahand-left
+│   │   │   │   │   └── config.yaml
+│   │   │   │   └── orcahand-right
+│   │   │   │       └── config.yaml
+│   │   │   └── v2
+│   │   │       ├── orcahand-full-left
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-full-right
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-joint-left
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-joint-right
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-left
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-right
+│   │   │       │   └── config.yaml
+│   │   │       ├── orcahand-touch-left
+│   │   │       │   └── config.yaml
+│   │   │       └── orcahand-touch-right
+│   │   │           └── config.yaml
+│   │   ├── __pycache__
+│   │   │   ├── base_hand.cpython-312.pyc
+│   │   │   ├── calibration.cpython-312.pyc
+│   │   │   ├── constants.cpython-312.pyc
+│   │   │   ├── hand_config.cpython-312.pyc
+│   │   │   ├── hand_factory.cpython-312.pyc
+│   │   │   ├── hardware_hand.cpython-312.pyc
+│   │   │   ├── hardware_hand_sensing.cpython-312.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── joint_position.cpython-312.pyc
+│   │   │   └── version.cpython-312.pyc
+│   │   ├── utils
+│   │   │   ├── cli.py
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   └── utils.cpython-312.pyc
+│   │   │   └── utils.py
+│   │   └── version.py
+│   ├── pyproject.toml
+│   ├── README.md
+│   ├── scripts
+│   │   ├── calibrate.py
+│   │   ├── check_encoder_signs.py
+│   │   ├── check_motor.py
+│   │   ├── check_sensors.py
+│   │   ├── configure_motor_chain.py
+│   │   ├── detect.py
+│   │   ├── guided_tension.py
+│   │   ├── manual_control.py
+│   │   ├── measure_travel.py
+│   │   ├── monitor_sensors.py
+│   │   ├── neutral.py
+│   │   ├── setup.py
+│   │   ├── stress_test.py
+│   │   ├── tension.py
+│   │   └── zero.py
+│   ├── tests
+│   │   ├── conftest.py
+│   │   ├── _encoder_helpers.py
+│   │   ├── _hand_feedback_helpers.py
+│   │   ├── _helpers.py
+│   │   ├── __init__.py
+│   │   ├── _loop_helpers.py
+│   │   ├── reference
+│   │   │   └── calibration_expected.yaml
+│   │   ├── test_absent_joints_in_maintenance.py
+│   │   ├── test_absent_motors.py
+│   │   ├── test_api.py
+│   │   ├── test_base_hand_contract.py
+│   │   ├── test_calibration_progress_printer.py
+│   │   ├── test_calibration.py
+│   │   ├── test_calibration_reference.py
+│   │   ├── test_calibration_routine.py
+│   │   ├── test_cli_hardware_version.py
+│   │   ├── test_config_registers.py
+│   │   ├── test_connect_resolution.py
+│   │   ├── test_core.py
+│   │   ├── test_demo_poses.py
+│   │   ├── test_dynamixel_client_locking.py
+│   │   ├── test_dynamixel_current_limits.py
+│   │   ├── test_dynamixel_scan_port.py
+│   │   ├── test_encoder_anchor_sampling.py
+│   │   ├── test_encoder_filter.py
+│   │   ├── test_encoder_polarity_by_side.py
+│   │   ├── test_encoder_protocol.py
+│   │   ├── test_feetech_client.py
+│   │   ├── test_feetech_registers.py
+│   │   ├── test_feetech_servo_gains.py
+│   │   ├── test_guided_tension.py
+│   │   ├── test_hand_class_layout.py
+│   │   ├── test_hand_config_loading.py
+│   │   ├── test_hand_detection.py
+│   │   ├── test_hand_factory.py
+│   │   ├── test_hand_serial_link.py
+│   │   ├── test_hardware_constants.py
+│   │   ├── test_hardware_hand_full.py
+│   │   ├── test_hardware_hand_joint_feedback.py
+│   │   ├── test_hardware_hand.py
+│   │   ├── test_hardware_version.py
+│   │   ├── test_jitter.py
+│   │   ├── test_joint_controller.py
+│   │   ├── test_joint_encoder_client.py
+│   │   ├── test_joint_gains_config.py
+│   │   ├── test_joint_loop.py
+│   │   ├── test_kinematics_extractor.py
+│   │   ├── test_kinematics.py
+│   │   ├── test_manual_calibration.py
+│   │   ├── test_manual_encoder_calibration.py
+│   │   ├── test_mock_sensing_connect.py
+│   │   ├── test_model_dispatch.py
+│   │   ├── test_motion_settle.py
+│   │   ├── test_motor_chain.py
+│   │   ├── test_motor_client_contract.py
+│   │   ├── test_motor_client_registry.py
+│   │   ├── test_motor_clients_feetech_parity.py
+│   │   ├── test_motor_travel_check.py
+│   │   ├── test_package_core_feetech.py
+│   │   ├── test_public_api_surface.py
+│   │   ├── test_scripts_cli.py
+│   │   ├── test_sensing_errors.py
+│   │   ├── test_sensing_health.py
+│   │   ├── test_serial_discovery.py
+│   │   ├── test_tactile_protocol.py
+│   │   ├── test_tactile_rearm.py
+│   │   ├── test_tactile_sensor.py
+│   │   ├── test_taxel_frames.py
+│   │   ├── test_taxel_geometry.py
+│   │   ├── test_tension.py
+│   │   ├── test_touch_connect.py
+│   │   ├── test_virtual_clock.py
+│   │   ├── test_windows_compat.py
+│   │   └── test_yaml.py
+│   ├── tools
+│   │   ├── check_downstream.py
+│   │   └── extract_urdf_kinematics.py
 │   └── uv.lock
 ├── orcahand_description-main
 │   ├── assets
@@ -2096,8 +2592,9 @@
 │       └── scene_right.xml
 ├── orca_hardware.py
 ├── palm_detection_sh4.blob
-├── probar_arctos.py
+├── probar_haptica_tactil.py
 ├── probar_ik_brazo.py
+├── puente_tactil.py
 ├── README.md
 ├── requirements.txt
 ├── skill_shield
@@ -2106,36 +2603,85 @@
 │   │   ├── control_suave.py
 │   │   ├── hibrido.py
 │   │   ├── ik_codo_muneca.py
+│   │   ├── ik_codo_muneca.py.bak_arctos
 │   │   ├── ik.py
 │   │   ├── __init__.py
-│   │   └── limites_humanos.py
+│   │   ├── limites_humanos.py
+│   │   ├── limites_humanos.py.bak_arctos
+│   │   └── __pycache__
+│   │       ├── angulos_humano.cpython-312.pyc
+│   │       ├── control_suave.cpython-312.pyc
+│   │       ├── hibrido.cpython-312.pyc
+│   │       ├── ik_codo_muneca.cpython-312.pyc
+│   │       ├── ik.cpython-312.pyc
+│   │       ├── __init__.cpython-312.pyc
+│   │       └── limites_humanos.cpython-312.pyc
 │   ├── comun
 │   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── suavizador.cpython-312.pyc
+│   │   │   └── suavizador.cpython-313.pyc
 │   │   └── suavizador.py
 │   ├── hardware
 │   │   ├── __init__.py
-│   │   └── sincronizacion.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── sincronizacion.cpython-312.pyc
+│   │   │   └── tactil_real.cpython-312.pyc
+│   │   ├── sincronizacion.py
+│   │   └── tactil_real.py
 │   ├── ia
 │   │   ├── act.py
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── act.cpython-312.pyc
+│   │       └── __init__.cpython-312.pyc
 │   ├── __init__.py
 │   ├── interfaz
 │   │   ├── hud_logo.py
 │   │   ├── __init__.py
 │   │   ├── menu.py
-│   │   └── perfil.py
+│   │   ├── perfil.py
+│   │   └── __pycache__
+│   │       ├── hud_logo.cpython-312.pyc
+│   │       ├── __init__.cpython-312.pyc
+│   │       ├── menu.cpython-312.pyc
+│   │       └── perfil.cpython-312.pyc
 │   ├── mano
 │   │   ├── biomecanica.py
 │   │   ├── __init__.py
 │   │   ├── manus_guante.py
+│   │   ├── __pycache__
+│   │   │   ├── biomecanica.cpython-312.pyc
+│   │   │   ├── biomecanica.cpython-313.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── manus_guante.cpython-312.pyc
+│   │   │   ├── manus_guante.cpython-313.pyc
+│   │   │   ├── retargeting.cpython-312.pyc
+│   │   │   └── retargeting.cpython-313.pyc
 │   │   └── retargeting.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   └── __init__.cpython-313.pyc
 │   ├── simulacion
 │   │   ├── demo_taladro.py
+│   │   ├── demo_taladro.py.bak_arctos
 │   │   ├── entorno_taladro.py
+│   │   ├── entorno_taladro.py.bak_arctos
 │   │   ├── entorno_taller.py
 │   │   ├── hilo_fisica.py
 │   │   ├── __init__.py
-│   │   └── objetos.py
+│   │   ├── objetos.py
+│   │   └── __pycache__
+│   │       ├── demo_taladro.cpython-312.pyc
+│   │       ├── entorno_taladro.cpython-312.pyc
+│   │       ├── entorno_taller.cpython-312.pyc
+│   │       ├── hilo_fisica.cpython-312.pyc
+│   │       ├── __init__.cpython-312.pyc
+│   │       └── objetos.cpython-312.pyc
 │   └── vision
 │       ├── camara_oak.py
 │       ├── detectores.py
@@ -2143,8 +2689,17 @@
 │       ├── __init__.py
 │       ├── multicamara.py
 │       ├── profundidad_3d.py
+│       ├── __pycache__
+│       │   ├── camara_oak.cpython-312.pyc
+│       │   ├── detectores.cpython-312.pyc
+│       │   ├── fusion_brazo.cpython-312.pyc
+│       │   ├── __init__.cpython-312.pyc
+│       │   ├── multicamara.cpython-312.pyc
+│       │   ├── profundidad_3d.cpython-312.pyc
+│       │   └── recorte_mano.cpython-312.pyc
 │       └── recorte_mano.py
 ├── Skill_Shield_Nivel_6.py
+├── Skill_Shield_Nivel_6.py.bak_arctos
 ├── tablero_charuco.png
 ├── taladro
 │   ├── drill.obj
@@ -2159,4 +2714,4 @@
 ├── test_ia_mano.py
 └── tree.txt
 
-208 directories, 1952 files
+291 directories, 2424 files

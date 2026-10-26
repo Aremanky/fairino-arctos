@@ -71,7 +71,8 @@ def semilla_girada(q):
     lleva a la solución con el codo doblado al OTRO lado ("codo arriba")."""
     q = np.asarray(q, dtype=float).copy()
     q[0] = _wrap(q[0] + math.pi)
-    q[1] = -q[1]
+    _f, _s, _off, _k = ARM_IMITACION["joint2"]        # q2 con el brazo vertical
+    q[1] = 2.0 * (_off + _s * _k * math.pi) - q[1]   # ARCTOS: -q2 · FR5: -π - q2
     return q
 
 

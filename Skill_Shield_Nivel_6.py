@@ -1366,7 +1366,8 @@ def main():
                                     if LIMITES_HUMANOS and "q3_recto" in hib:
                                         _semillas += [("codo espejo", semilla_codo_espejo(_q_ik, hib)),
                                                       ("codo plegado arriba", np.clip(
-                                                          [_q_ik[0], 0.0, 0.0], hib["lo"], hib["hi"]))]
+                                                          [_q_ik[0], *angulos_humano_a_q_brazo(0.0, math.pi, 1.52)[1:3]],   # ARCTOS (q1,0,0) · FR5 (q1,-π/2,-1.52)
+                                                          hib["lo"], hib["hi"]))]
                                     _q_r, _err_r, _c_r, _nom_r = rescatar_ik(
                                         modelo, datos, _oc, _om, _w_c, hib, _semillas,
                                         q_actual=_q_ik, q1_ref=_q1_ref)

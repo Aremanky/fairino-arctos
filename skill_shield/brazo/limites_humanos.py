@@ -211,11 +211,35 @@ def _fk_palma(modelo, datos, hib, q3):
     return palma, hombro, codo, eje2
 
 
+def _q_imit(joint, ang):
+    """Ángulo humano (rad) → valor del joint con ARM_IMITACION (sin recortar)."""
+    _f, s, off, k = ARM_IMITACION[joint]
+    return off + s * k * ang
+
+
+def _signo_espejo(modelo, datos, hib):
+    """Sentido en que hay que girar el hombro para pasar el codo al otro lado sin mover
+    la palma: +1 si joint2 y joint3 giran en sentidos opuestos (ARCTOS), -1 si en el
+    mismo (FR5). Se mide: el signo que deja la palma más cerca de donde estaba."""
+    q = np.clip(np.array([0.0, 0.5 * (hib["lo"][1] + hib["hi"][1]), hib["q3_recto"] - 0.8]),
+                hib["lo"], hib["hi"])
+    p0 = _fk_palma(modelo, datos, hib, q)[0]
+    mejor, signo = None, 1.0
+    for s in (1.0, -1.0):
+        hib["espejo_signo"] = s
+        e = float(np.linalg.norm(_fk_palma(modelo, datos, hib, semilla_codo_espejo(q, hib))[0] - p0))
+        if mejor is None or e < mejor:
+            mejor, signo = e, s
+    return signo
+
+
 def completar_hib(modelo, datos, hib, verbose=True):
     """Añade a 'hib' el codo recto real, la longitud efectiva del antebrazo y
     recorta hib['lo'] / hib['hi'] a límites con sentido físico (ver cabecera)."""
     # — joint3 recto: el que da MÁS alcance hombro→palma —
-    qs = np.linspace(1.2, 1.9, 141)
+    # (FR5: se busca en todo el rango de joint3; antes 1.2..1.9, que solo valía para el ARCTOS)
+    _lo3, _hi3 = LIMITES_CTRL_BRAZO[2]
+    qs = np.linspace(max(_lo3, -math.pi), min(_hi3, math.pi), 721)
     dist = []
     for q in qs:
         palma, hombro, _, _ = _fk_palma(modelo, datos, hib, np.array([0.0, 0.0, q]))
@@ -234,18 +258,22 @@ def completar_hib(modelo, datos, hib, verbose=True):
     # — límites —
     flex = math.radians(CODO_FLEX_MAX)
     z_h = float(hombro[2])
-    c = (CODO_Z_MIN - z_h) / max(L1p, 1e-6)
-    q2_max = math.acos(float(np.clip(c, -1.0, 1.0)))
-    az_lo, az_hi = HOMBRO_AZ_MIN, 180.0
-    q1_lo = -math.radians(az_hi) - Q1_MARGEN            # q1 = -azimut
-    q1_hi = -math.radians(az_lo) + Q1_MARGEN
-    lo = np.array([max(hib["lo"][0], q1_lo), max(hib["lo"][1], Q2_MIN),
+    # FR5: los límites salen de ARM_IMITACION (el mismo mapeo que la imitación), no de
+    # suponer "q2 = 0 vertical" y "q1 = -azimut" (solo cierto en el ARCTOS, donde da
+    # exactamente los valores de antes).
+    e_min = math.acos(float(np.clip((z_h - CODO_Z_MIN) / max(L1p, 1e-6), -1.0, 1.0)))
+    q2_lo, q2_hi = sorted((_q_imit("joint2", e_min),               # codo a CODO_Z_MIN
+                           _q_imit("joint2", math.pi - Q2_MIN)))  # pasado de la vertical
+    _q1 = (_q_imit("joint1", math.radians(HOMBRO_AZ_MIN)), _q_imit("joint1", math.pi))
+    q1_lo, q1_hi = min(_q1) - Q1_MARGEN, max(_q1) + Q1_MARGEN
+    lo = np.array([max(hib["lo"][0], q1_lo), max(hib["lo"][1], q2_lo),
                    max(hib["lo"][2], q3_recto - flex)])
-    hi = np.array([min(hib["hi"][0], q1_hi), min(hib["hi"][1], q2_max),
+    hi = np.array([min(hib["hi"][0], q1_hi), min(hib["hi"][1], q2_hi),
                    min(hib["hi"][2], q3_recto + flex)])
     hib["lo"], hib["hi"] = lo, hi
+    hib["espejo_signo"] = _signo_espejo(modelo, datos, hib)   # ARCTOS +1 · FR5 -1
     if verbose:
-        print(f"🦴 Límites ARCTOS (humanos+suelo): q1 [{lo[0]:.2f}, {hi[0]:.2f}]  "
+        print(f"🦴 Límites del brazo (humanos+suelo): q1 [{lo[0]:.2f}, {hi[0]:.2f}]  "
               f"q2 [{lo[1]:.2f}, {hi[1]:.2f}]  q3 [{lo[2]:.2f}, {hi[2]:.2f}]  "
               f"(codo recto q3={q3_recto:.3f}, hombro a {z_h:.2f} m)")
         f_abajo = math.degrees(hi[2] - q3_recto)
@@ -320,6 +348,6 @@ def semilla_codo_espejo(q, hib):
     phi = hib["q3_recto"] - q[2]
     L1, L2 = hib["L1_ef"], hib["L2_ef"]
     beta = math.atan2(L2 * math.sin(phi), L1 + L2 * math.cos(phi))
-    q[1] = q[1] + 2.0 * beta
+    q[1] = q[1] + hib.get("espejo_signo", 1.0) * 2.0 * beta
     q[2] = 2.0 * hib["q3_recto"] - q[2]
     return np.clip(q, hib["lo"], hib["hi"])

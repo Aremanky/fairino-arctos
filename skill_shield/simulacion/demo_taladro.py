@@ -168,9 +168,14 @@ class DemoTaladro:
         self.p_md_dis = self.G_loc - self.R_md_dis @ self.c_mango
 
         # Semillas para la IK (varias posturas de partida del brazo)
-        self.semillas = [np.array([j1, j2, j3, 0.0, j5, 0.0])
+        # (elevación, codo) en rad → joint2/joint3 con ARM_IMITACION. Con el ARCTOS salen
+        # exactamente las de antes: (0.5, 1.0), (1.0, 0.2), (-0.5, 1.2).
+        from skill_shield.brazo.angulos_humano import angulos_humano_a_q_brazo
+        _posturas = [tuple(angulos_humano_a_q_brazo(0.0, e, c)[1:3])
+                     for e, c in ((2.6416, 0.52), (2.1416, 1.32), (3.6416, 0.32))]
+        self.semillas = [np.array([j1, j2, j3, 0.0, JOINT5_FIJO + j5, 0.0])
                          for j1 in np.linspace(-2.4, 2.4, 7)
-                         for (j2, j3) in ((0.5, 1.0), (1.0, 0.2), (-0.5, 1.2))
+                         for (j2, j3) in _posturas
                          for j5 in (0.6, -0.6)]
 
         # Manos (17 valores de ctrl)
@@ -182,7 +187,7 @@ class DemoTaladro:
 
         # Autocolisiones: eslabones del ARCTOS (sus propios geoms) y mano. Los pares que
         # ya se tocan en posturas normales (mallas que solapan en las uniones) no cuentan.
-        self.cuerpos_brazo = {b for b in (_id(B, f"Link_{k}_1") for k in range(1, 7)) if b >= 0}
+        self.cuerpos_brazo = {int(modelo.jnt_bodyid[_id(J, j)]) for j in ARM_JOINTS}   # ARCTOS y FR5
         self.cuerpos_mano = set(entorno_taladro.cuerpos_mano)
         self.geoms_brazo = [g for g in range(modelo.ngeom) if modelo.geom_bodyid[g] in self.cuerpos_brazo]
         self.col_brazo_orig = {g: (int(modelo.geom_contype[g]), int(modelo.geom_conaffinity[g]))

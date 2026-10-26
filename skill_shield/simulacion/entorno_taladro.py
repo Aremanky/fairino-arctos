@@ -109,7 +109,9 @@ class EntornoTaladro:
         qa  = [modelo.jnt_qposadr[j] for j in ids]
         bm  = mujoco.mj_name2id(modelo, mujoco.mjtObj.mjOBJ_BODY, "mano_mount")
         guarda = [float(datos.qpos[i]) for i in qa]
-        for i, v in zip(qa, (0.0, 0.0, 1.52)):          # joint3 = 1.52 → antebrazo recto
+        # brazo VERTICAL y recto (ARCTOS: 0, 0, 1.52 · FR5: π/2, -π/2, 0)
+        from skill_shield.brazo.angulos_humano import angulos_humano_a_q_brazo
+        for i, v in zip(qa, angulos_humano_a_q_brazo(0.0, math.pi, 0.0)):
             datos.qpos[i] = v
         mujoco.mj_kinematics(modelo, datos)
         z = float((datos.xpos[bm] + datos.xmat[bm].reshape(3, 3) @ np.array(OFFSET_LOCAL_PALMA))[2])

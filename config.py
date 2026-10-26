@@ -963,3 +963,59 @@ MANUS_HAPTICA_TAU_BAJADA = 0.08           # s: al soltar se apaga sin parpadeos
 MANUS_HAPTICA_HZ    = 30.0                # máx. envíos de vibración al guante por segundo
 MANUS_HAPTICA_SIEMPRE = False             # True: vibra aunque el guante no mande ([S]/standby, modo IA...)
 MANUS_HAPTICA_DEBUG = False               # True: imprime fuerza y vibración por dedo cada 0.5 s
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BRAZO: ARCTOS <-> FAIRINO FR5 (26-oct) — añadido por aplicar_fr5.py
+# ═══════════════════════════════════════════════════════════════════════════
+# Al ir al final MANDA sobre los valores del ARCTOS de más arriba.
+# "ARCTOS" = todo exactamente como antes · "FR5" = brazo FAIRINO FR5.
+ROBOT_BRAZO = "FR5"
+
+if ROBOT_BRAZO == "FR5":
+    # Modelo: lo genera crear_fairino_mjcf.py (mismo arctos_mjcf.xml con el FR5 en vez del ARCTOS)
+    RUTA_XML = os.path.join(_BASE_DIR, "fairino_description", "mjcf", "fairino_mjcf.xml")
+
+    # Rangos reales del FR5: ±175° · -265°..+85° · ±160° · -265°..+85° · ±175° · ±175°
+    LIMITES_CTRL_BRAZO = [
+        (-3.0543, 3.0543),   # joint1 (base)
+        (-4.6251, 1.4835),   # joint2 (hombro)  — 0 = brazo horizontal, -π/2 = vertical
+        (-2.8274, 2.8274),   # joint3 (codo)    — 0 = antebrazo recto
+        (-4.6251, 1.4835),   # joint4 (muñeca 1)
+        (-3.0543, 3.0543),   # joint5 (muñeca 2)
+        (-3.0543, 3.0543),   # joint6 (muñeca 3, giro de la brida)
+    ]
+
+    # Muñeca "recta" (la OrcaHand sigue la línea del antebrazo): joint4 = 0 y joint5 = +90°.
+    # (El FR5 tiene muñeca tipo UR; en el ARCTOS la recta era joint5 = 0.)
+    JOINT5_FIJO = 1.5708
+
+    # Reposo: brazo vertical, antebrazo 25° por debajo de la horizontal, muñeca recta
+    POSICION_STANDBY_BRAZO = [0.0, -1.5708, 2.0, 0.0, 1.5708, 0.0]
+
+    # Ángulos humanos → joints. Calculado con la cinemática del FR5 para que las
+    # direcciones sean LAS MISMAS que con el ARCTOS (delante del robot = -Y, T-pose = -X):
+    #   joint1 = π/2 - azimut     (T-pose → 0, brazo al frente → π/2)
+    #   joint2 = π/2 - elevación  (horizontal → 0, arriba → -π/2, colgando → +π/2)
+    #   joint3 = -codo            (codo recto → 0; T-pose + codo 90° → antebrazo hacia arriba)
+    # Si al probar un joint se mueve al revés, cambia SOLO su signo (+1 ↔ -1).
+    ARM_IMITACION = {
+        "joint1": ("azimut",    -1.0, math.pi / 2, 1.0),
+        "joint2": ("elevacion", -1.0, math.pi / 2, 1.0),
+        "joint3": ("codo",      -1.0, 0.0,         1.0),
+    }
+    IMITAR_LIMITES = {
+        "joint1": (-3.0543, 3.0543),
+        "joint2": (-2.10, 1.4835),   # -2.10 = 0.5 rad más allá de la vertical, hacia atrás
+        "joint3": (-2.8274, 2.8274),
+    }
+
+    # Pose al pulsar [A]: None = T-pose del robot (joint1..3 = 0, brazo horizontal).
+    # La del ARCTOS salía de una foto del brazo real; para el FR5 se puede sacar igual.
+    POSE_BRAZO_ACTIVAR = None
+
+    # Espacio de trabajo. El hombro del FR5 está a 0.155 m sobre la peana (el del ARCTOS a
+    # 0.29) y el brazo es mucho más largo (0.425 + 0.395 m). Con CODO_Z_MIN = 0 el codo puede
+    # bajar hasta la altura de la peana (~21° por debajo de la horizontal).
+    CODO_Z_MIN    = 0.0
+    ARM_RADIO_MAX = 0.90

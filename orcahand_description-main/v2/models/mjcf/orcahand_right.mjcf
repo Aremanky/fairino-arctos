@@ -50,9 +50,6 @@
 		<!-- Logo Elecnor en el dorso de la mano -->
 		<texture name="logo_elecnor" type="2d" file="models/assets/Logo_Elecnor_AZUL.png" />
 		<material name="logo_elecnor_material" texture="logo_elecnor" texuniform="false" rgba="1 1 1 1" />
-		<!-- Autores de la mano -->
-		<texture name="tex_nombres" type="2d" file="models/assets/Nombres_Naranja.png" />
-		<material name="mat_nombres" texture="tex_nombres" texuniform="false" rgba="1 1 1 1" emission="1.0" />
 	</asset>
 	<actuator>
 		<position name="right_wrist_actuator" joint="right_wrist" ctrlrange="-1.1344640137963142 0.6108652381980153" />

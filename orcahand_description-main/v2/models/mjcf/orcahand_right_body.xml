@@ -107,17 +107,6 @@
 			      material="logo_elecnor_material"
 			      contype="0"
 			      conaffinity="0" />
-
-				<!-- 1º numero de pos: X, 2º: Z (altura) Y 3º: Y-->
-			<geom name="right_nombres_lateral"
-			      type="box"
-			      size="0.04 0.02 0.001"
-			      pos="-0.005 0.01 0.048"
-			      euler="0 0 0"
-			      material="mat_nombres"
-			      contype="0"
-			      conaffinity="0"
-			      mass="0" />
 		</body>
 	</body>
 </mujoco>

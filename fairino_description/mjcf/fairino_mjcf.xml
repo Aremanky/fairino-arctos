@@ -180,65 +180,73 @@
 
     <!-- ══ BRAZO FAIRINO FR5 (base fija, sin colisión) ══ -->
     <body name="base_link" pos="0 0 0">
-      <geom type="mesh" mesh="fr5_vis_base_0" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-      <geom type="mesh" mesh="fr5_vis_base_1" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-      <geom type="mesh" mesh="fr5_vis_base_2" rgba="0.25 0.25 0.25 1" contype="0" conaffinity="0" group="2"/>
+      <geom type="mesh" mesh="fr5_vis_base_0" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+      <geom type="mesh" mesh="fr5_vis_base_1" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+      <geom type="mesh" mesh="fr5_vis_base_2" material="fr5e_oscuro" contype="0" conaffinity="0" group="2"/>
       <geom type="mesh" mesh="fr5_col_base_link" contype="0" conaffinity="0" group="3" rgba="0.5 0.5 0.5 0.3"/>
       <body name="shoulder_Link" pos="0 0 0" quat="1 0 0 0" gravcomp="1">
         <inertial pos="0.00000 -0.00510 0.16749" mass="4.0" diaginertia="0.013300 0.013001 0.009270"/>
         <joint name="joint1" axis="0 0 1" range="-3.0543 3.0543"/>
-        <geom type="mesh" mesh="fr5_vis_shoulder_0" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
-        <geom type="mesh" mesh="fr5_vis_shoulder_1" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-        <geom type="mesh" mesh="fr5_vis_shoulder_2" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-        <geom type="mesh" mesh="fr5_vis_shoulder_3" rgba="0.63 0.63 0.63 1" contype="0" conaffinity="0" group="2"/>
-        <geom type="mesh" mesh="fr5_vis_shoulder_4" rgba="0.75 0.75 0.75 1" contype="0" conaffinity="0" group="2"/>
+        <geom type="mesh" mesh="fr5_vis_shoulder_0" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
+        <geom type="mesh" mesh="fr5_vis_shoulder_1" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+        <geom type="mesh" mesh="fr5_vis_shoulder_2" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+        <geom type="mesh" mesh="fr5_vis_shoulder_3" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
+        <geom type="mesh" mesh="fr5_vis_shoulder_4" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
         <geom type="mesh" mesh="fr5_col_shoulder_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
         <body name="upperarm_Link" pos="0 0 0.155" quat="0.5 0.5 -0.5 0.5" gravcomp="1">
           <inertial pos="0.00000 0.21250 0.13547" mass="6.5" diaginertia="0.172373 0.021126 0.165825"/>
           <joint name="joint2" axis="0 0 1" range="-4.6251 1.4835"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_0" rgba="0.63 0.63 0.63 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_1" rgba="0.38 0.38 0.38 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_2" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_3" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_4" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_5" rgba="1 0 0 1" contype="0" conaffinity="0" group="2"/>
-          <geom type="mesh" mesh="fr5_vis_upperarm_6" rgba="0.75 0.75 0.75 1" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_0" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_1" material="fr5e_oscuro" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_2" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_3" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_4" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_5" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
+          <geom type="mesh" mesh="fr5_vis_upperarm_6" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
           <geom type="mesh" mesh="fr5_col_upperarm_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
+          <!-- ══ DECO ELECNOR (decorar_fr5.py) ══ -->
+          <geom name="fr5e_brazo_franja_hombro" type="cylinder" fromto="0 0.097 0.1363 0 0.105 0.1363" size="0.0458" material="fr5e_franja" contype="0" conaffinity="0" group="2" mass="0"/>
+          <geom name="fr5e_brazo_franja_codo" type="cylinder" fromto="0 0.3215 0.1363 0 0.3295 0.1363" size="0.0458" material="fr5e_franja" contype="0" conaffinity="0" group="2" mass="0"/>
+          <!-- ══ FIN DECO ELECNOR ══ -->
           <body name="forearm_Link" pos="0 0.425 0" quat="0.707107 0 0 -0.707107" gravcomp="1">
             <inertial pos="-0.18111 -0.00000 0.00437" mass="3.5" diaginertia="0.008538 0.075512 0.074816"/>
             <joint name="joint3" axis="0 0 1" range="-2.8274 2.8274"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_0" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_1" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_2" rgba="1 0.38 0.08 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_3" rgba="0.63 0.63 0.63 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_4" rgba="0.89 0.09 0 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_5" rgba="0.92 0.04 0 1" contype="0" conaffinity="0" group="2"/>
-            <geom type="mesh" mesh="fr5_vis_forearm_6" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_0" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_1" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_2" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_3" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_4" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_5" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
+            <geom type="mesh" mesh="fr5_vis_forearm_6" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
             <geom type="mesh" mesh="fr5_col_forearm_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
+            <!-- ══ DECO ELECNOR (decorar_fr5.py) ══ -->
+            <geom name="fr5e_antebrazo_franja_codo" type="cylinder" fromto="-0.091 0 0 -0.099 0 0" size="0.0408" material="fr5e_franja" contype="0" conaffinity="0" group="2" mass="0"/>
+            <geom name="fr5e_antebrazo_franja_muneca" type="cylinder" fromto="-0.337 0 0 -0.345 0 0" size="0.0408" material="fr5e_franja" contype="0" conaffinity="0" group="2" mass="0"/>
+            <!-- ══ FIN DECO ELECNOR ══ -->
             <body name="wrist1_Link" pos="-0.395 0 0" quat="0.707107 0 0 0.707107" gravcomp="1">
               <inertial pos="0.00044 -0.00000 0.10975" mass="1.5" diaginertia="0.002425 0.003547 0.002723"/>
               <joint name="joint4" axis="0 0 1" range="-4.6251 1.4835"/>
-              <geom type="mesh" mesh="fr5_vis_wrist1_0" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-              <geom type="mesh" mesh="fr5_vis_wrist1_1" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
-              <geom type="mesh" mesh="fr5_vis_wrist1_2" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-              <geom type="mesh" mesh="fr5_vis_wrist1_3" rgba="1 0.38 0.08 1" contype="0" conaffinity="0" group="2"/>
-              <geom type="mesh" mesh="fr5_vis_wrist1_4" rgba="0.63 0.63 0.63 1" contype="0" conaffinity="0" group="2"/>
+              <geom type="mesh" mesh="fr5_vis_wrist1_0" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+              <geom type="mesh" mesh="fr5_vis_wrist1_1" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
+              <geom type="mesh" mesh="fr5_vis_wrist1_2" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+              <geom type="mesh" mesh="fr5_vis_wrist1_3" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
+              <geom type="mesh" mesh="fr5_vis_wrist1_4" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
               <geom type="mesh" mesh="fr5_col_wrist1_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
               <body name="wrist2_Link" pos="0 0 0.13" quat="0.5 0.5 -0.5 -0.5" gravcomp="1">
                 <inertial pos="0.00008 -0.01264 0.09851" mass="1.5" diaginertia="0.002843 0.001721 0.002723"/>
                 <joint name="joint5" axis="0 0 1" range="-3.0543 3.0543"/>
-                <geom type="mesh" mesh="fr5_vis_wrist2_0" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
-                <geom type="mesh" mesh="fr5_vis_wrist2_1" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
-                <geom type="mesh" mesh="fr5_vis_wrist2_2" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-                <geom type="mesh" mesh="fr5_vis_wrist2_3" rgba="0.63 0.63 0.63 1" contype="0" conaffinity="0" group="2"/>
-                <geom type="mesh" mesh="fr5_vis_wrist2_4" rgba="1 0.38 0.08 1" contype="0" conaffinity="0" group="2"/>
+                <geom type="mesh" mesh="fr5_vis_wrist2_0" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
+                <geom type="mesh" mesh="fr5_vis_wrist2_1" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
+                <geom type="mesh" mesh="fr5_vis_wrist2_2" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+                <geom type="mesh" mesh="fr5_vis_wrist2_3" material="fr5e_banda" contype="0" conaffinity="0" group="2"/>
+                <geom type="mesh" mesh="fr5_vis_wrist2_4" material="fr5e_acento" contype="0" conaffinity="0" group="2"/>
                 <geom type="mesh" mesh="fr5_col_wrist2_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
                 <body name="wrist3_Link" pos="0 0 0.102" quat="0.5 -0.5 0.5 0.5" gravcomp="1">
                   <inertial pos="-0.00015 -0.00010 0.07880" mass="0.5" diaginertia="0.000354 0.000354 0.000533"/>
                   <joint name="joint6" axis="0 0 1" range="-3.0543 3.0543"/>
-                  <geom type="mesh" mesh="fr5_vis_wrist3_0" rgba="0.9 0.92 0.93 1" contype="0" conaffinity="0" group="2"/>
-                  <geom type="mesh" mesh="fr5_vis_wrist3_1" rgba="0.78 0.76 0.74 1" contype="0" conaffinity="0" group="2"/>
-                  <geom type="mesh" mesh="fr5_vis_wrist3_2" rgba="1 1 1 1" contype="0" conaffinity="0" group="2"/>
+                  <geom type="mesh" mesh="fr5_vis_wrist3_0" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
+                  <geom type="mesh" mesh="fr5_vis_wrist3_1" material="fr5e_detalle" contype="0" conaffinity="0" group="2"/>
+                  <geom type="mesh" mesh="fr5_vis_wrist3_2" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
                   <geom type="mesh" mesh="fr5_col_wrist3_Link" contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.3"/>
                   <site name="flange" pos="0 0 0.102" size="0.006" rgba="1 0 0 1" group="4"/>
                   <!-- ── OrcaHand en la brida del FR5 (mano_mount +Y = eje de la brida) ── -->
@@ -257,6 +265,7 @@
        Materiales primero (los usan también la mesa y el taladro) y luego el escenario base. -->
   <include file="decoracion/deco_assets.xml"/>
   <include file="decoracion/deco_escena_base.xml"/>
+  <include file="decoracion/deco_brazo_fr5.xml"/>   <!-- colores y logos del FR5 (decorar_fr5.py) -->
   <include file="mesa_trabajo.xml"/>
   <include file="escena_taladro.xml"/>
 

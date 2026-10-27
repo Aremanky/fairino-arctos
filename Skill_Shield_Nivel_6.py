@@ -1992,16 +1992,21 @@ def main():
                         if not taller.disponible:
                             print("⚠ El entorno de trabajo no está en el modelo "
                                   "(falta el include de mesa_trabajo.xml).")
-                        elif taller.alternar(modelo, datos):
-                            print("🧰 Entorno de trabajo MOSTRADO (alicates, destornillador, "
-                                  "bombilla y fusible recolocados).")
-                            if TALLER_ENCUADRAR_CAMARA:
-                                visor.cam.lookat[:]  = TALLER_CAMARA["lookat"]
-                                visor.cam.distance   = TALLER_CAMARA["distancia"]
-                                visor.cam.azimuth    = TALLER_CAMARA["azimut"]
-                                visor.cam.elevation  = TALLER_CAMARA["elevacion"]
                         else:
-                            print("⬛ Entorno de trabajo OCULTADO.")
+                            # 27-oct: un escenario cada vez, como hace [4]: con el soporte de
+                            # hombros la mesa baja y ocupa el sitio de la peana del taladro
+                            if not taller.visible and taladro.disponible and taladro.visible:
+                                taladro.ocultar(modelo, datos)
+                            if taller.alternar(modelo, datos):
+                                print("🧰 Entorno de trabajo MOSTRADO (alicates, destornillador, "
+                                      "bombilla y fusible recolocados).")
+                                if TALLER_ENCUADRAR_CAMARA:
+                                    visor.cam.lookat[:]  = TALLER_CAMARA["lookat"]
+                                    visor.cam.distance   = TALLER_CAMARA["distancia"]
+                                    visor.cam.azimuth    = TALLER_CAMARA["azimut"]
+                                    visor.cam.elevation  = TALLER_CAMARA["elevacion"]
+                            else:
+                                print("⬛ Entorno de trabajo OCULTADO.")
 
                     elif key == ord("4"):
                         # [4] — Escenario taladro (techo + peana + taladro)

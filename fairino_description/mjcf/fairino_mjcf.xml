@@ -130,30 +130,33 @@
     <!-- Panel trasero blanco y franja naranja -->
     <material name="panel_blanco" rgba="1 1 1 1"/>
 
-    <!-- Peana del brazo: zócalo y tapa en gris grafito metálico -->
+    <!-- (antes: peana del brazo; el material se conserva por si algo lo usa) -->
     <material name="peana_metal" rgba="0.20 0.22 0.25 1" specular="0.6" shininess="0.6"/>
   </asset>
 
   <worldbody>
     <light pos="0 0 2" dir="0 0 -1"/>
 
-    <!-- ══ PEANA DEL BRAZO ══════════════════════════════════════════════════════
-         El brazo NO se ha movido: su base sigue en z = 0 (igual que antes). Lo que
-         baja es el SUELO, ALTURA_PEANA = 0.70 m, y en el hueco va la peana.
-         Así todo lo que usa coordenadas del mundo (taladro [4]/[5], mesa [3],
-         PALMA_Z_MIN, CODO_Z_MIN, ARM_Z_MINIMA, techo automático...) sigue igual.
-         El suelo y la peana NO chocan con nada (contype/conaffinity = 0), igual
-         que el suelo de antes: son solo decorado.
-         Para cambiar la altura de la peana, cambia las z marcadas con [H]
-         (H = 0.70) y las patas de mesa_trabajo.xml si H pasa de ~1 m. -->
-    <geom name="floor" type="plane" pos="0 0 -0.70" size="2 2 0.1" material="suelo_elecnor_material"/>  <!-- [H] -->
+    <!-- ══ SOPORTE DEL BRAZO: columna con cabezal en T y hombros a 45° (27-oct) ═══════
+         Sustituye a la peana azul. El FR5 va atornillado en la placa del HOMBRO DERECHO
+         (-X), inclinado 45° hacia fuera y hacia abajo, como en la foto del soporte.
+         Su HOMBRO (eje de joint2) sigue EXACTAMENTE donde estaba: (0, 0, 0.155). Lo que
+         se mueve es la base (gira alrededor de ese punto), el soporte y el SUELO, que
+         baja a z = -0.975 (hombro a 1.13 m del suelo, como un hombro humano).
+         Así lo que el programa coloca en coordenadas del mundo (taladro [4]/[5], techo
+         automático...) sigue a la misma distancia del hombro del robot.
+         El soporte está en decoracion/soporte_hombros.xml y lo GENERA
+         decoracion/crear_soporte_hombros.py (medidas, colores y pose de base_link).
+         Suelo y soporte NO chocan con nada (contype/conaffinity = 0): son decorado.
+         Las z que dependen del suelo están marcadas con [H] (suelo = -0.975). -->
+    <geom name="floor" type="plane" pos="0 0 -0.975" size="2 2 0.1" material="suelo_elecnor_material"/>  <!-- [H] -->
 
     <!-- ══ DECORADO CORPORATIVO: geoms estáticos, solo visuales (contype/conaffinity = 0) ══ -->
-    <!-- Pared de fondo blanca: ahora baja hasta el nuevo suelo (de z = -0.70 a 1.35) -->
-    <geom name="deco_pared" type="box" pos="0 1.8 0.325" size="1.8 0.01 1.025"
+    <!-- Pared de fondo blanca: baja hasta el suelo (de z = -0.975 a 1.35) -->
+    <geom name="deco_pared" type="box" pos="0 1.8 0.1875" size="1.8 0.01 1.1625"
           material="panel_blanco" contype="0" conaffinity="0"/>                                <!-- [H] -->
     <!-- Franja naranja inferior, apoyada en el suelo -->
-    <geom name="deco_franja" type="box" pos="0 1.785 -0.64" size="1.8 0.008 0.06"
+    <geom name="deco_franja" type="box" pos="0 1.785 -0.915" size="1.8 0.008 0.06"
           material="naranja_personalizado" contype="0" conaffinity="0"/>                       <!-- [H] -->
     <!-- Logo Elecnor (plano mirando hacia -Y, hacia el robot) -->
     <geom name="deco_logo_elecnor" type="plane" pos="-0.84 1.785 0.8" euler="1.5708 0 0" size="0.72 0.24 0.02"
@@ -162,24 +165,8 @@
     <geom name="deco_logo_departamento" type="plane" pos="0.84 1.785 0.8" euler="1.5708 0 0" size="0.72 0.24 0.02"
           material="logo_departamento_material" contype="0" conaffinity="0"/>
 
-    <!-- Peana: zócalo en el suelo, columna azul, franja naranja y tapa bajo la base -->
-    <geom name="deco_peana_zocalo" type="box" pos="0 0 -0.68" size="0.24 0.24 0.02"
-          material="peana_metal" contype="0" conaffinity="0"/>                                 <!-- [H] -->
-    <geom name="deco_peana_columna" type="box" pos="0 0 -0.35" size="0.15 0.15 0.31"
-          material="azul_personalizado" contype="0" conaffinity="0"/>                          <!-- [H] -->
-    <geom name="deco_peana_franja" type="box" pos="0 0 -0.12" size="0.152 0.152 0.018"
-          material="naranja_personalizado" contype="0" conaffinity="0"/>
-    <geom name="deco_peana_tapa" type="box" pos="0 0 -0.02" size="0.19 0.19 0.02"
-          material="peana_metal" contype="0" conaffinity="0"/>
-    <!-- Logo Elecnor en la cara delantera de la columna (-Y, la que ve la cámara inicial) -->
-    <geom name="deco_peana_logo" type="plane" pos="0 -0.1515 -0.40" euler="1.5708 0 0" size="0.13 0.043 0.01"
-          material="logo_elecnor_material" contype="0" conaffinity="0"/>
-    <!-- Disco naranja bajo la base del brazo (encima de la tapa, como antes) -->
-    <geom name="deco_peana" type="cylinder" pos="0 0 0.001" size="0.16 0.001"
-          material="naranja_personalizado" contype="0" conaffinity="0"/>
-
     <!-- ══ BRAZO FAIRINO FR5 (base fija, sin colisión) ══ -->
-    <body name="base_link" pos="0 0 0">
+    <body name="base_link" pos="0.109601551 0 0.264601551" quat="0.27059805 -0.653281482 -0.653281482 0.27059805">
       <geom type="mesh" mesh="fr5_vis_base_0" material="fr5e_carcasa" contype="0" conaffinity="0" group="2"/>
       <geom type="mesh" mesh="fr5_vis_base_1" material="fr5e_tapa" contype="0" conaffinity="0" group="2"/>
       <geom type="mesh" mesh="fr5_vis_base_2" material="fr5e_oscuro" contype="0" conaffinity="0" group="2"/>
@@ -266,6 +253,7 @@
   <include file="decoracion/deco_assets.xml"/>
   <include file="decoracion/deco_escena_base.xml"/>
   <include file="decoracion/deco_brazo_fr5.xml"/>   <!-- colores y logos del FR5 (decorar_fr5.py) -->
+  <include file="decoracion/soporte_hombros.xml"/>  <!-- soporte con hombros a 45° (crear_soporte_hombros.py) -->
   <include file="mesa_trabajo.xml"/>
   <include file="escena_taladro.xml"/>
 

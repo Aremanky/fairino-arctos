@@ -10,6 +10,7 @@ import math
 from config import *
 
 from skill_shield.brazo.angulos_humano import _lm_hand, _unitario, _wrap
+from skill_shield.brazo import base_brazo   # 27-oct: base inclinada (soporte de hombros)
 
 # ── 7-oct: valores por defecto de los parámetros nuevos (por si config.py es antiguo) ──
 for _k, _v in {
@@ -71,6 +72,9 @@ def semilla_girada(q):
     lleva a la solución con el codo doblado al OTRO lado ("codo arriba")."""
     q = np.asarray(q, dtype=float).copy()
     q[0] = _wrap(q[0] + math.pi)
+    if base_brazo.BASE_INCLINADA:                     # 27-oct: brazo alineado con joint1
+        q[1] = 2.0 * base_brazo.Q2_EJE_BASE - q[1]
+        return q
     _f, _s, _off, _k = ARM_IMITACION["joint2"]        # q2 con el brazo vertical
     q[1] = 2.0 * (_off + _s * _k * math.pi) - q[1]   # ARCTOS: -q2 · FR5: -π - q2
     return q
@@ -276,11 +280,25 @@ def reubicar_palma(datos, hib, hombro, v):
         return np.asarray(v, dtype=float), h_ref, 0.0
     u, w = reubicar_direccion(np.asarray(v) / d, d, float(hombro[2]), PALMA_Z_MIN, h_ref)
     hib["_w_horizontal"] = w
+    hib["_dir_palma"] = u                 # 27-oct: para bloqueo_base con la base inclinada
     return u * d, h_ref, w
 
 
+# 27-oct: con la base INCLINADA, joint1 solo es "indefinido" cuando la palma está sobre
+# su eje (brazo apuntando hacia fuera-abajo a 45°, o al revés), no con el brazo vertical.
+BASE_BLOQUEO_ANG = globals().get("BASE_BLOQUEO_ANG", 5.0)   # grados alrededor del eje
+IK_EJE_ANG = globals().get("IK_EJE_ANG", 30.0)       # ° alrededor del eje donde joint1 se frena
+IK_EJE_EXTRA = globals().get("IK_EJE_EXTRA", 8.0)    # × peso de continuidad de joint1 sobre el eje
+
+
 def bloqueo_base(hib):
-    """[joint1, joint2, joint3] que la IK NO debe mover: joint1 con el brazo vertical."""
+    """[joint1, joint2, joint3] que la IK NO debe mover: joint1 con el brazo vertical
+    (base vertical) o con la palma sobre el eje de joint1 (base inclinada)."""
+    if base_brazo.BASE_INCLINADA:
+        u = hib.get("_dir_palma")
+        sobre_eje = (u is not None and abs(float(np.dot(u, base_brazo.EJE_BASE)))
+                     > math.cos(math.radians(BASE_BLOQUEO_ANG)))
+        return np.array([sobre_eje, False, False])
     return np.array([hib.get("_w_horizontal", 1.0) < BASE_BLOQUEO_W, False, False])
 
 
@@ -380,13 +398,24 @@ def resolver_ik_codo_muneca(modelo, datos, obj_c, obj_m, w_codo, hib, q_inicial,
     cont = q_ref is not None and w_cont > 0.0
     q_ref = np.asarray(q_ref, dtype=float) if cont else None
     n_filas = 9 if cont else 6
+    # 27-oct: con la base INCLINADA, cerca del eje de joint1 (palma hacia fuera-abajo a
+    # 45°) la base tendría que dar media vuelta en pocos fotogramas para ganar unos cm.
+    # Ahí la continuidad de joint1 pesa más: la base gira poco a poco y sin saltos.
+    w_vec = np.full(3, float(w_cont))
+    if cont and base_brazo.BASE_INCLINADA:
+        _u = np.asarray(obj_m, dtype=float) - datos.xanchor[hib["j_hombro"]]
+        _n = float(np.linalg.norm(_u))
+        if _n > 1e-6:
+            _ang = math.degrees(math.acos(min(1.0, abs(float(_u @ base_brazo.EJE_BASE)) / _n)))
+            _k = float(np.clip((IK_EJE_ANG - _ang) / IK_EJE_ANG, 0.0, 1.0))
+            w_vec[0] *= 1.0 + IK_EJE_EXTRA * _k
 
     def errores(qq):
         ec = float(np.linalg.norm(obj_c - datos.xanchor[jc]))
         em = float(np.linalg.norm(obj_m - punta()))
         tot = float(np.hypot(w_codo * ec, em))
         if cont:
-            tot = float(np.hypot(tot, w_cont * np.linalg.norm(qq - q_ref)))
+            tot = float(np.hypot(tot, np.linalg.norm(w_vec * (qq - q_ref))))
         return tot, ec, em
 
     q = np.clip(np.asarray(q_inicial, dtype=float), lo, hi)
@@ -401,8 +430,8 @@ def resolver_ik_codo_muneca(modelo, datos, obj_c, obj_m, w_codo, hib, q_inicial,
         J = np.vstack([w_codo * J_c, J_m])
         e = np.concatenate([w_codo * (obj_c - p_c), obj_m - p_m])
         if cont:                                             # PASO 7.2: continuidad
-            J = np.vstack([J, w_cont * np.eye(3)])
-            e = np.concatenate([e, w_cont * (q_ref - q)])
+            J = np.vstack([J, np.diag(w_vec)])
+            e = np.concatenate([e, w_vec * (q_ref - q)])
 
         libres = np.ones(3, dtype=bool) if bloqueados is None \
             else ~np.asarray(bloqueados, dtype=bool)

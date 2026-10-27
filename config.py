@@ -1019,3 +1019,79 @@ if ROBOT_BRAZO == "FR5":
     # bajar hasta la altura de la peana (~21° por debajo de la horizontal).
     CODO_Z_MIN    = 0.0
     ARM_RADIO_MAX = 0.90
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SOPORTE DEL BRAZO: COLUMNA CON HOMBROS A 45° (27-oct)
+# ═══════════════════════════════════════════════════════════════════════════
+# El FR5 va en la placa del HOMBRO DERECHO del soporte nuevo, inclinado 45° hacia fuera y
+# hacia abajo (fairino_description/mjcf/decoracion/crear_soporte_hombros.py). Su HOMBRO
+# (eje de joint2) sigue en (0, 0, 0.155), donde estaba con la peana; el suelo baja a
+# z = -0.975 (hombro a 1.13 m del suelo, como el de una persona).
+#
+# Se DETECTA SOLO leyendo fairino_mjcf.xml: si base_link tiene la base girada, se aplica
+# todo este bloque; si se vuelve a poner la peana (base sin girar), no se aplica nada y
+# todo queda exactamente como antes. El mapeo ángulos humanos → joints con la base
+# inclinada está en skill_shield/brazo/base_brazo.py.
+def _leer_soporte(ruta):
+    """(base_girada, z del suelo) según el MJCF."""
+    import xml.etree.ElementTree as _ET
+    girada, suelo = False, None
+    try:
+        for _g in _ET.parse(ruta).getroot().iter():
+            if _g.tag == "body" and _g.get("name") == "base_link" and _g.get("quat"):
+                _q = [float(_v) for _v in _g.get("quat").split()]
+                girada = abs(abs(_q[0]) / math.sqrt(sum(_v * _v for _v in _q)) - 1.0) > 1e-9
+            elif _g.tag == "geom" and _g.get("name") == "floor":
+                suelo = float(_g.get("pos", "0 0 0").split()[2])
+    except Exception as _e:
+        print(f"⚠ config: no puedo leer {ruta} ({_e})")
+    return girada, suelo
+
+
+SOPORTE_HOMBROS, SOPORTE_SUELO_Z = _leer_soporte(RUTA_XML)
+SOPORTE_HOMBROS = SOPORTE_HOMBROS and ROBOT_BRAZO == "FR5"
+
+if SOPORTE_HOMBROS:
+    if SOPORTE_SUELO_Z is None:
+        SOPORTE_SUELO_Z = -0.975
+
+    # Reposo: brazo a lo largo del eje de la base (hacia fuera y abajo, 45°, como en la
+    # foto), antebrazo hacia delante y ~12° hacia abajo, muñeca recta. [S] y el final de [5].
+    POSICION_STANDBY_BRAZO = [0.0, -1.5708, 1.35, 0.0, 1.5708, 0.0]
+
+    # Alturas mínimas: antes eran respecto a la PEANA (z = 0, casi a la altura del hombro);
+    # ahora el brazo cuelga como el de una persona y el límite es el SUELO (y el bastidor
+    # del soporte, que llega a 0.23 m del suelo). Con el hombro a 1.13 m ya casi no hace
+    # falta "comprimir" la parte de abajo: tu brazo colgando ≈ su brazo colgando.
+    PALMA_Z_MIN  = SOPORTE_SUELO_Z + 0.25   # centro de la palma (los dedos cuelgan algo más)
+    CODO_Z_MIN   = SOPORTE_SUELO_Z + 0.30
+    ARM_Z_MINIMA = SOPORTE_SUELO_Z + 0.20
+
+    # joint1 solo se bloquea en la IK con la palma a menos de esto (°) del eje de la base
+    BASE_BLOQUEO_ANG = 5.0
+
+    # Peana del taladro de [4]/[5]: misma dirección y altura respecto al hombro que antes,
+    # pero más lejos (0.72 m en horizontal en vez de 0.49). Con el brazo colgando del hombro,
+    # en (-0.45, -0.20) su columna quedaba justo donde se mueve el brazo y la demo [5] la
+    # atravesaba al subir y al volver a reposo.
+    TALADRO_POS_SOPORTE = (-0.66, -0.29, 0.25)
+
+    # Demo [5]: con la base inclinada, a 5 cm del alcance máximo la muñeca (joint6) llega a
+    # su tope de ±175° al perforar. Con 10 cm el techo queda ~5 cm más bajo y sobra muñeca.
+    TALADRO_DEMO_MARGEN_TECHO = 0.10
+
+    # Mesa de [3]: con el brazo colgando, a la altura a la que trabaja una mano (0.55 m por
+    # debajo del hombro, 0.58 m sobre el suelo), delante y a la derecha del robot: tu brazo
+    # hacia delante-derecha y abajo con el codo doblado. (Antes: (-0.8, 0.0, 0.10), a la
+    # altura de la peana.) No se pone justo a 45° hacia fuera-abajo: ahí apunta el eje de
+    # joint1 y la base tendría que girar mucho para pequeños movimientos de la mano.
+    # Las patas quedan fuera del bastidor del soporte. La usa entorno_taller.py.
+    TALLER_POS_MESA = (-0.45, -0.45, -0.40)
+    # Cámara del visor al pulsar [3] (la de antes quedaba detrás de la columna)
+    TALLER_CAMARA = {
+        "lookat":    (0.6 * TALLER_POS_MESA[0], 0.6 * TALLER_POS_MESA[1], TALLER_POS_MESA[2] + 0.20),
+        "distancia": 1.6,
+        "azimut":    60,
+        "elevacion": -22,
+    }

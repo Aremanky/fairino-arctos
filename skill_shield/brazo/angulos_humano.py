@@ -9,6 +9,7 @@ import math
 from config import *
 
 from skill_shield.vision.profundidad_3d import pixel_a_3d
+from skill_shield.brazo import base_brazo   # 27-oct: base inclinada (soporte de hombros)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -579,10 +580,14 @@ def angulos_humano_a_q_brazo(azimut_rad: float, elevacion_rad: float, codo_rad: 
     IMITAR_LIMITES y a LIMITES_CTRL_BRAZO.
     """
     fuentes = {"azimut": azimut_rad, "elevacion": elevacion_rad, "codo": codo_rad}
+    # 27-oct: con la base INCLINADA (soporte de hombros) la tabla lineal no vale: mapeo
+    # exacto con la cinemática del FR5 (base_brazo.py). Con la base vertical, lo de siempre.
+    q_inc = (base_brazo.q_desde_angulos(azimut_rad, elevacion_rad, codo_rad)
+             if base_brazo.BASE_INCLINADA else None)
     q = []
     for k, joint in enumerate(("joint1", "joint2", "joint3")):
         fuente, signo, offset, escala = ARM_IMITACION[joint]
-        v = offset + signo * escala * fuentes[fuente]
+        v = offset + signo * escala * fuentes[fuente] if q_inc is None else float(q_inc[k])
         lo, hi = IMITAR_LIMITES[joint]
         lo = max(lo, LIMITES_CTRL_BRAZO[k][0])
         hi = min(hi, LIMITES_CTRL_BRAZO[k][1])
@@ -627,10 +632,17 @@ def angulos_humano_a_q_brazo_rel(az_deg, el_deg, co_deg, ref_deg, q_ref):
     fuentes = {"azimut":    math.radians(d_az),
                "elevacion": math.radians(el_deg - ref_deg[1]),
                "codo":      math.radians(co_deg - ref_deg[2])}
+    dq_inc = None
+    if base_brazo.BASE_INCLINADA:
+        # 27-oct: base inclinada → incremento con el mapeo exacto (tu postura − tu T-pose)
+        q_a = base_brazo.q_desde_angulos(*(math.radians(v) for v in (az_deg, el_deg, co_deg)))
+        q_t = base_brazo.q_desde_angulos(*(math.radians(v) for v in ref_deg))
+        dq_inc = q_a - q_t
+        dq_inc[0] = (dq_inc[0] + math.pi) % (2.0 * math.pi) - math.pi
     q = []
     for k, joint in enumerate(("joint1", "joint2", "joint3")):
         fuente, signo, _offset, escala = ARM_IMITACION[joint]
-        v = q_ref[k] + signo * escala * fuentes[fuente]
+        v = q_ref[k] + (signo * escala * fuentes[fuente] if dq_inc is None else float(dq_inc[k]))
         lo, hi = IMITAR_LIMITES[joint]
         lo = max(lo, LIMITES_CTRL_BRAZO[k][0])
         hi = min(hi, LIMITES_CTRL_BRAZO[k][1])

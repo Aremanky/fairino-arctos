@@ -9,6 +9,7 @@ Va en `arctos_description-main/arctos_urdf_description/urdf/decoracion/`, junto 
 | `deco_mesa.xml` | dentro del body `taller_mesa` (`mesa_trabajo.xml`) | Canto naranja, faldón azul con logos, panel trasero de taller con rótulo, logos y herramienta colgada |
 | `deco_taladro_peana.xml` | dentro del body `taladro_soporte` (`escena_taladro.xml`) | Columna corporativa bajo la placa del taladro, con logos verticales y base en el suelo |
 | `deco_taladro_techo.xml` | dentro del body `taladro_techo` (`escena_taladro.xml`) | Faldón azul/naranja con logos en las 4 caras y marco de cinta de seguridad alrededor de la zona de taladrado |
+| `soporte_hombros.xml` | `fairino_mjcf.xml` (raíz) | Soporte del FR5 (27-oct): bastidor con ruedas, columna, cabezal en T y dos hombros a 45°; el FR5 va en el hombro DERECHO. Lo genera `crear_soporte_hombros.py` (medidas, colores y pose de `base_link`) |
 | `texturas/*.png` | — | Rótulos, cinta de seguridad y panel perforado (generados) |
 
 ## Reglas que cumple todo (para no tocar la funcionalidad)
@@ -23,7 +24,9 @@ Va en `arctos_description-main/arctos_urdf_description/urdf/decoracion/`, junto 
 
 - `TALADRO_POS_SOPORTE` (altura): mueve la base de suelo de `deco_taladro_peana.xml` (marca [Z]).
 - `TALADRO_DEMO_AGUJERO_XY` o `TALADRO_TECHO_XY`: mueve el marco de `deco_taladro_techo.xml` (marca [A]).
-- Altura del suelo (`ALTURA_PEANA`): las z marcadas con [H] en `deco_escena_base.xml`.
+- Altura del suelo: las z marcadas con [H] en `fairino_mjcf.xml` y `deco_escena_base.xml`, la base
+  [Z] de `deco_taladro_peana.xml` y `SOPORTE_SUELO_Z` sale sola de `fairino_mjcf.xml` (geom `floor`).
+  Con el soporte de hombros el suelo está en z = -0.975 (antes -0.70 con la peana).
 
 ## Si regeneras `escena_taladro.xml` con `taladro/preparar_taladro.py`
 

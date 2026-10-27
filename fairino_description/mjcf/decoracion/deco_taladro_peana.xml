@@ -18,7 +18,8 @@
   prefijo).
 
   [Z] La base de suelo está calculada para TALADRO_POS_SOPORTE z = 0.25 y suelo en
-      z = -0.70: suelo en coordenadas de la peana = -0.70 - (0.25 - 0.01) = -0.94.
+      z = -0.975 (soporte de hombros, 27-oct; antes -0.70): suelo en coordenadas de la
+      peana = -0.975 - (0.25 - 0.01) = -1.215.
       Si cambias esa altura, mueve la base (la columna ya es larga de sobra y se
       mete bajo el suelo).
 -->
@@ -31,14 +32,14 @@
   <!-- Cabezal de grafito bajo la placa -->
   <geom name="deco_peana_tal_cabezal" type="box" pos="0 0 -0.02" size="0.07 0.07 0.01"
         material="deco_grafito" group="2" contype="0" conaffinity="0" density="0"/>
-  <!-- Columna azul (de -0.03 hasta 1.2 m más abajo: llega al suelo y se mete debajo) -->
-  <geom name="deco_peana_tal_columna" type="box" pos="0 0 -0.63" size="0.06 0.06 0.60"
+  <!-- Columna azul (de -0.03 hasta 1.26 m más abajo: llega al suelo y se mete debajo) -->
+  <geom name="deco_peana_tal_columna" type="box" pos="0 0 -0.66" size="0.06 0.06 0.63"
         material="deco_azul" group="2" contype="0" conaffinity="0" density="0"/>
   <!-- Franja naranja cerca de la parte de arriba -->
   <geom name="deco_peana_tal_franja" type="box" pos="0 0 -0.07" size="0.0615 0.0615 0.012"
         material="deco_naranja" group="2" contype="0" conaffinity="0" density="0"/>
   <!-- Base de grafito apoyada en el suelo [Z] -->
-  <geom name="deco_peana_tal_base" type="box" pos="0 0 -0.93" size="0.11 0.11 0.01"
+  <geom name="deco_peana_tal_base" type="box" pos="0 0 -1.205" size="0.11 0.11 0.01"
         material="deco_grafito" group="2" contype="0" conaffinity="0" density="0"/>
 
   <!-- Logos en VERTICAL (se leen de abajo arriba), sobre placas blancas -->

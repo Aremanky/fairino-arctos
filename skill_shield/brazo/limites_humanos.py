@@ -40,6 +40,7 @@ from config import *
 from skill_shield.brazo.ik_codo_muneca import (   # 7-oct: espacio de trabajo (puntos 1 y 3)
     CODO_Z_MIN as _CODO_Z_MIN_OBJ, REUBICAR_OBJETIVOS, reubicar_direccion, reubicar_palma,
 )
+from skill_shield.brazo import base_brazo         # 27-oct: base inclinada (soporte de hombros)
 
 # ── Valores por defecto (se pueden sobrescribir en config.py) ────────────────
 _DEF = {
@@ -262,10 +263,21 @@ def completar_hib(modelo, datos, hib, verbose=True):
     # suponer "q2 = 0 vertical" y "q1 = -azimut" (solo cierto en el ARCTOS, donde da
     # exactamente los valores de antes).
     e_min = math.acos(float(np.clip((z_h - CODO_Z_MIN) / max(L1p, 1e-6), -1.0, 1.0)))
-    q2_lo, q2_hi = sorted((_q_imit("joint2", e_min),               # codo a CODO_Z_MIN
-                           _q_imit("joint2", math.pi - Q2_MIN)))  # pasado de la vertical
-    _q1 = (_q_imit("joint1", math.radians(HOMBRO_AZ_MIN)), _q_imit("joint1", math.pi))
-    q1_lo, q1_hi = min(_q1) - Q1_MARGEN, max(_q1) + Q1_MARGEN
+    if base_brazo.BASE_INCLINADA:
+        # 27-oct: base inclinada → joint1/joint2 no son "azimut/elevación". Sus límites salen
+        # de recorrer con el mapeo exacto todo el rango humano (elevación desde la del codo
+        # a CODO_Z_MIN hasta el brazo arriba y, en cada una, el azimut de rango_azimut) +
+        # márgenes.
+        (q1a, q1b), (q2a, q2b) = base_brazo.rangos_q12(
+            lambda e: tuple(math.radians(v) for v in rango_azimut(math.degrees(e))),
+            e_min, math.pi)
+        q1_lo, q1_hi = q1a - Q1_MARGEN, q1b + Q1_MARGEN
+        q2_lo, q2_hi = q2a - abs(Q2_MIN), q2b + abs(Q2_MIN)
+    else:
+        q2_lo, q2_hi = sorted((_q_imit("joint2", e_min),               # codo a CODO_Z_MIN
+                               _q_imit("joint2", math.pi - Q2_MIN)))  # pasado de la vertical
+        _q1 = (_q_imit("joint1", math.radians(HOMBRO_AZ_MIN)), _q_imit("joint1", math.pi))
+        q1_lo, q1_hi = min(_q1) - Q1_MARGEN, max(_q1) + Q1_MARGEN
     lo = np.array([max(hib["lo"][0], q1_lo), max(hib["lo"][1], q2_lo),
                    max(hib["lo"][2], q3_recto - flex)])
     hi = np.array([min(hib["hi"][0], q1_hi), min(hib["hi"][1], q2_hi),

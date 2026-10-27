@@ -25,6 +25,10 @@ from skill_shield.simulacion.objetos import OBJ_OCULTO
 #   z → altura de la superficie de trabajo
 # Los objetos y la cámara se mueven solos con la mesa.
 TALLER_POS_MESA = (-0.8, 0.0, 0.10)
+# 27-oct: con el soporte de hombros la mesa baja a la altura de trabajo del brazo
+# colgando; config.py la pone en TALLER_POS_MESA (solo si el modelo tiene ese soporte).
+import config as _config
+TALLER_POS_MESA = tuple(getattr(_config, "TALLER_POS_MESA", TALLER_POS_MESA))
 
 TALLER_MESA = "taller_mesa"
 
@@ -59,6 +63,7 @@ TALLER_CAMARA = {
     "azimut":    225,
     "elevacion": -30,
 }
+TALLER_CAMARA = dict(getattr(_config, "TALLER_CAMARA", TALLER_CAMARA))   # 27-oct (soporte de hombros)
 
 
 class EntornoTaller:

@@ -9,8 +9,8 @@
     · cabecera azul con rótulo y doble cenefa azul-naranja en la pared del fondo
     · pared lateral derecha (x = +1.8) con logo Elecnor, cabecera y zócalo
     · cinta de seguridad amarilla/negra en el suelo delimitando la célula del robot
-    · placa con el logo Elecnor en el suelo, delante de la peana
-    · logo I+D+i en la cara -X de la peana del brazo
+    · placa con el logo Elecnor en el suelo, delante del soporte del brazo
+    · (el logo I+D+i de la antigua peana va ahora en el soporte: soporte_hombros.xml)
     · una luz de relleno suave (sin sombras, no carga la GPU)
 
   REGLAS (para no tocar la funcionalidad):
@@ -18,8 +18,8 @@
     · No hay ningún <body> nuevo: no cambian qpos, mocap, ids de cuerpos ni masas.
     · Nada se pone en -X ni en -Y del robot más allá de la cinta del suelo: por ahí
       están las cámaras del visor de [4] y de la demo [5] (TALADRO_DEMO_CAMARA).
-    · El suelo está en z = -0.70 (ALTURA_PEANA de arctos_mjcf.xml). Si cambias esa
-      altura, cambia también las z marcadas con [H].
+    · El suelo está en z = -0.975 (soporte de hombros, 27-oct; antes -0.70 con la
+      peana). Si cambias esa altura, cambia también las z marcadas con [H].
 -->
 <mujoco model="decoracion_escena_base">
   <worldbody>
@@ -45,9 +45,9 @@
     <!-- ══ PARED LATERAL DERECHA (x = 1.8, cara interior en x = 1.79) ══
          Va de y = -0.59 hasta la pared del fondo: forma la esquina del stand.
          No se pone pared en -X ni en -Y (taparía las cámaras de [4] y [5]). -->
-    <geom name="deco_lateral_pared" type="box" pos="1.8 0.6 0.325" size="0.01 1.19 1.025"
+    <geom name="deco_lateral_pared" type="box" pos="1.8 0.6 0.1875" size="0.01 1.19 1.1625"
           material="deco_blanco" group="2" contype="0" conaffinity="0"/>                     <!-- [H] -->
-    <geom name="deco_lateral_zocalo" type="box" pos="1.785 0.6 -0.64" size="0.008 1.19 0.06"
+    <geom name="deco_lateral_zocalo" type="box" pos="1.785 0.6 -0.915" size="0.008 1.19 0.06"
           material="deco_naranja" group="2" contype="0" conaffinity="0"/>                    <!-- [H] -->
     <geom name="deco_lateral_cabecera" type="box" pos="1.778 0.6 1.22" size="0.012 1.19 0.13"
           material="deco_azul" group="2" contype="0" conaffinity="0"/>
@@ -63,28 +63,27 @@
     <geom name="deco_lateral_logo" type="plane" pos="1.785 0.6 0.75" xyaxes="0 -1 0 0 0 1" size="0.6 0.2 0.01"
           material="logo_elecnor_material" group="2" contype="0" conaffinity="0"/>
 
-    <!-- ══ SUELO (z = -0.70) ══ -->
+    <!-- ══ SUELO (z = -0.975) ══ -->
     <!-- Cinta de seguridad: cuadrado de 2.2 m alrededor del robot (incluye mesa y peana
          del taladro). 2 mm por encima del suelo para que no parpadee con él. -->
-    <geom name="deco_cinta_n" type="box" pos="0  1.075 -0.6992" size="1.10 0.025 0.0008"
+    <geom name="deco_cinta_n" type="box" pos="0  1.075 -0.9742" size="1.10 0.025 0.0008"
           material="deco_cinta" group="2" contype="0" conaffinity="0"/>                      <!-- [H] -->
-    <geom name="deco_cinta_s" type="box" pos="0 -1.075 -0.6992" size="1.10 0.025 0.0008"
+    <geom name="deco_cinta_s" type="box" pos="0 -1.075 -0.9742" size="1.10 0.025 0.0008"
           material="deco_cinta" group="2" contype="0" conaffinity="0"/>                      <!-- [H] -->
-    <geom name="deco_cinta_e" type="box" pos=" 1.075 0 -0.6992" size="0.025 1.05 0.0008"
+    <geom name="deco_cinta_e" type="box" pos=" 1.075 0 -0.9742" size="0.025 1.05 0.0008"
           material="deco_cinta" group="2" contype="0" conaffinity="0"/>                      <!-- [H] -->
-    <geom name="deco_cinta_o" type="box" pos="-1.075 0 -0.6992" size="0.025 1.05 0.0008"
+    <geom name="deco_cinta_o" type="box" pos="-1.075 0 -0.9742" size="0.025 1.05 0.0008"
           material="deco_cinta" group="2" contype="0" conaffinity="0"/>                      <!-- [H] -->
-    <!-- Placa blanca con el logo Elecnor DELANTE de la peana (detrás la tapa la propia peana
-         desde la vista inicial). Se lee desde -Y: cámaras de [4] y de la demo [5]. No pisa la
-         base de la peana del taladro (esa llega hasta y = -0.09). -->
-    <geom name="deco_suelo_placa" type="box" pos="0 -0.55 -0.6993" size="0.42 0.155 0.0006"
+    <!-- Placa blanca con el logo Elecnor DELANTE del soporte (centrada con su columna, por
+         delante del bastidor, que llega a y = -0.40). Se lee desde -Y: cámaras de [4] y de la
+         demo [5]. No pisa la base de la peana del taladro (x de -0.56 a -0.34). -->
+    <geom name="deco_suelo_placa" type="box" pos="0.26 -0.58 -0.9743" size="0.42 0.155 0.0006"
           material="deco_blanco" group="2" contype="0" conaffinity="0"/>                     <!-- [H] -->
-    <geom name="deco_suelo_logo" type="plane" pos="0 -0.55 -0.6985" size="0.375 0.125 0.01"
+    <geom name="deco_suelo_logo" type="plane" pos="0.26 -0.58 -0.9735" size="0.375 0.125 0.01"
           material="logo_elecnor_material" group="2" contype="0" conaffinity="0"/>           <!-- [H] -->
 
-    <!-- ══ PEANA DEL BRAZO: logo I+D+i en la cara -X de la columna (la que ve la demo [5]) ══ -->
-    <geom name="deco_peana_logo_idi" type="plane" pos="-0.1515 0 -0.40" xyaxes="0 -1 0 0 0 1" size="0.13 0.043 0.01"
-          material="logo_departamento_material" group="2" contype="0" conaffinity="0"/>
+    <!-- (El logo I+D+i que iba en la peana del brazo está ahora en la cara trasera de la
+         columna del soporte: decoracion/soporte_hombros.xml) -->
 
   </worldbody>
 </mujoco>

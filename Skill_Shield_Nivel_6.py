@@ -885,6 +885,72 @@ def main():
                         print("⚠️  Cámara B abierta SIN extrínsecos: se muestra, pero NO se fusiona. "
                               "Ejecuta  python calibrar_extrinseca.py")
 
+                # ── TELEOP FR5 v2 (27-oct): muñeca + codo con las dos cámaras → IK de 6 ejes ──
+                # skill_shield/teleop_fr5. Sustituye a los PASOS 2-7 del brazo (que quedan
+                # desactivados con TELEOP_FR5_V2 = True): fusión robusta a la palma delante de
+                # una cámara, límites humanos reales, IK analítica (8 configuraciones) y cambio
+                # de configuración planificado cuando la actual no puede seguir.
+                teleop_v2 = None
+                if globals().get("TELEOP_FR5_V2", False) and MODO_BRAZO == "imitacion":
+                    from skill_shield.teleop_fr5.teleop_brazo import TeleopBrazoFR5, ConfigTeleop
+                    from skill_shield.teleop_fr5.fusion_muneca_codo import (
+                        Camara as _CamV2, Intrinsecos as _IntrV2, ObservacionCamara as _ObsV2,
+                        Parametros as _ParFusionV2)
+                    from skill_shield.teleop_fr5.retargeting import (
+                        ConfigRetargeting as _CfgRetV2, LimitesAnatomicos as _LimAnatV2)
+                    from skill_shield.teleop_fr5.ik_teleop import (
+                        ParametrosIK as _ParIKV2, Entorno as _EntornoV2, entorno_soporte_hombros)
+                    try:
+                        intr_v2_a = _IntrV2.desde_K(_K, ANCHO_CAM, ALTO_CAM)
+                    except NameError:
+                        intr_v2_a = _IntrV2.desde_focal(f_px_cam, ANCHO_CAM, ALTO_CAM)
+                    _cams_v2 = {"A": _CamV2("A")}
+                    intr_v2_b = None
+                    if fusor_b is not None:
+                        _cams_v2["B"] = _CamV2("B", _ext[0], _ext[1])
+                        intr_v2_b = (_IntrV2.desde_K(cam_b.K, ANCHO_CAM, ALTO_CAM) if cam_b.K is not None
+                                     else _IntrV2.desde_focal(cam_b.f_px, ANCHO_CAM, ALTO_CAM))
+                    if globals().get("SOPORTE_HOMBROS", False):
+                        _ent_v2 = entorno_soporte_hombros(SOPORTE_SUELO_Z)
+                        _z_min_v2 = SOPORTE_SUELO_Z + 0.25
+                    else:
+                        _ent_v2 = _EntornoV2(z_suelo=0.0)
+                        _z_min_v2 = ARM_Z_MINIMA
+                    if globals().get("TELEOP_FR5_Z_MIN") is not None:
+                        _z_min_v2 = TELEOP_FR5_Z_MIN
+                    teleop_v2 = TeleopBrazoFR5(
+                        RUTA_XML, _cams_v2,
+                        cfg=ConfigTeleop(brazo=BRAZO_HUMANO, longitudes_manual=LONG_BRAZO_MANUAL,
+                                         n_calibracion=CALIB_HUESOS_FRAMES),
+                        par_fusion=_ParFusionV2(vis_min=POSE_VISIBILIDAD_MIN, z_min=PROF_Z_MIN, z_max=PROF_Z_MAX,
+                                                prof_radio_px=PROF_RADIO_PX, prof_percentil=PROF_PERCENTIL,
+                                                prof_min_pix=PROF_MIN_PIXELES,
+                                                escorzo_ang=tuple(globals().get("TELEOP_FR5_ESCORZO_DEG", (20.0, 40.0))),
+                                                hold_s=float(globals().get("TELEOP_FR5_HOLD_S", 0.8)),
+                                                hombro_hacia_torso=HOMBRO_PROF_HACIA_TORSO,
+                                                arriba_ref=ARRIBA_REF),
+                        cfg_retarget=_CfgRetV2(escala=globals().get("TELEOP_FR5_ESCALA"),
+                                               fraccion_alcance=float(globals().get("TELEOP_FR5_FRACCION", 0.85)),
+                                               z_min=_z_min_v2, prono_escala_z=PRONO_Z_ESCALA,
+                                               roll_rango_deg=float(globals().get("TELEOP_FR5_ROLL_RANGO_DEG", 120.0))),
+                        lim_anatomicos=_LimAnatV2(hombro_az_min=HOMBRO_AZ_MIN, hombro_az_max=HOMBRO_AZ_MAX,
+                                                  hombro_ext_elev=HOMBRO_EXT_ELEV,
+                                                  hombro_az_libre_elev=HOMBRO_AZ_LIBRE_ELEV,
+                                                  codo_flex_max=CODO_FLEX_MAX, humero_rot_ext=HUMERO_ROT_EXT,
+                                                  humero_rot_int=HUMERO_ROT_INT, activos=LIMITES_HUMANOS),
+                        par_ik=_ParIKV2(limites_extra=dict(globals().get("TELEOP_FR5_LIMITES", {})),
+                                        v_seguimiento=float(globals().get("TELEOP_FR5_V_MAX", 3.0)),
+                                        postura_humana=bool(globals().get("TELEOP_FR5_POSTURA_HUMANA", True)),
+                                        codo_signo=globals().get("TELEOP_FR5_CODO_SIGNO"),
+                                        muneca_q4_deg=float(globals().get("TELEOP_FR5_MUNECA_DEG", (80.0, 60.0))[0]),
+                                        muneca_q5_deg=float(globals().get("TELEOP_FR5_MUNECA_DEG", (80.0, 60.0))[1])),
+                        entorno=_ent_v2)
+                    teleop_v2.cadena.comparar_con_dh()
+                    print(f"🦾 TELEOP FR5 v2 activa: cámaras {list(_cams_v2)}, alcance robot "
+                          f"{teleop_v2.retarget.alcance_robot:.2f} m, suelo {_ent_v2.z_suelo}")
+                t_ult_print_v2 = 0.0
+                t_prev_v2 = None
+
                 angulos_brazo    = None   # últimos ángulos válidos del brazo humano
                 t_ult_ang_valido = 0.0    # perf_counter() del último frame con _ang != None
                 t_ult_print_ang  = 0.0
@@ -932,7 +998,13 @@ def main():
                 if SUAVE_ACTIVO and MODO_BRAZO == "imitacion":
                     # 9-oct: también joint4/joint5 (la pose de [A] los mueve): sin tirones
                     _extra_suave = [_i for _i in (3, 4) if _i != prono_idx]
-                    gen_brazo = GeneradorSuave(
+                    if teleop_v2 is not None:
+                        # v2: los 6 joints con la misma velocidad (el FR5 admite 3,15 rad/s)
+                        _v_v2 = float(globals().get("TELEOP_FR5_SUAVE_VEL", 2.5))
+                        _a_v2 = float(globals().get("TELEOP_FR5_SUAVE_ACEL", 20.0))
+                        gen_brazo = GeneradorSuave((0, 1, 2, 3, 4, 5), (_v_v2,) * 6, (_a_v2,) * 6)
+                    else:
+                        gen_brazo = GeneradorSuave(
                         (0, 1, 2, prono_idx, *_extra_suave),
                         tuple(SUAVE_VEL_MAX)
                         + (float(globals().get("SUAVE_VEL_MUNECA_ARCTOS", 1.5)),) * len(_extra_suave),
@@ -1195,7 +1267,8 @@ def main():
                                                   _ang_uso["delante"], _ang_uso["lado"])
 
                         if MODO_BRAZO == "imitacion" and estado["camara_activa"] \
-                                and est_brazo.calibrado and _ang_uso is not None:
+                                and est_brazo.calibrado and _ang_uso is not None \
+                                and teleop_v2 is None:   # v2: el brazo lo mueve teleop_fr5 (más abajo)
                             _t = time.perf_counter()
                             if not brazo_imit_activo:
                                 # T-pose medida durante la calibración → referencia de postura
@@ -1458,8 +1531,8 @@ def main():
                                           f"{_obj_mano[2]:.2f}) m   error mano={100 * _err:4.1f} cm   "
                                           f"peso={peso_hib:.2f}")
 
-                    # — Estado de la calibración de huesos / imitación (HUD) —
-                    if MODO_BRAZO == "imitacion" and estado["camara_activa"]:
+                    # — Estado de la calibración de huesos / imitación (HUD) —  (v2: su propio HUD)
+                    if MODO_BRAZO == "imitacion" and estado["camara_activa"] and teleop_v2 is None:
                         if est_brazo.calibrando:
                             cv2.putText(frame_bgr,
                                         f"CALIBRANDO HUESOS {est_brazo.progreso}/{est_brazo.n_objetivo}"
@@ -1534,8 +1607,8 @@ def main():
                         hand_lm  = resultado.multi_hand_landmarks[0]
                         hand_wlm = resultado.multi_hand_world_landmarks[0]
 
-                        # ══ PASO 5 — PRONOSUPINACIÓN → joint6 ══
-                        if estado["camara_activa"] and estado["antebrazo"] is not None:
+                        # ══ PASO 5 — PRONOSUPINACIÓN → joint6 ══  (no con v2: lo hace la IK de 6 ejes)
+                        if estado["camara_activa"] and estado["antebrazo"] is not None and teleop_v2 is None:
                             roll = calcular_pronosupinacion(hand_wlm, estado["antebrazo"],
                                                             estado["eje_codo"])
                             _t = time.perf_counter()
@@ -1619,8 +1692,8 @@ def main():
                                         print(f"[PRONO{' mundo' if _q6_mundo is not None else ''}] "
                                               f"giro={math.degrees(d):6.1f}°  →  "
                                               f"q6 CMD={q_prono:5.2f}  REAL={datos.qpos[qpos_idx_brazo[prono_idx]]:5.2f} rad")
-                        if not sujetar_pose_A:           # 9-oct: no durante la pose de [A]
-                            _enviar_brazo((4,), (JOINT5_FIJO,))   # joint5 siempre recto
+                        if not sujetar_pose_A and teleop_v2 is None:   # 9-oct: no durante la pose de [A]
+                            _enviar_brazo((4,), (JOINT5_FIJO,))   # joint5 siempre recto (v2: lo decide la IK)
 
                         # Dibujar esqueleto en el frame
                         mp_draw.draw_landmarks(
@@ -1777,6 +1850,54 @@ def main():
                     if perfil is not None:
                         perfil.marca("dedos")
 
+                    # ══ TELEOP FR5 v2: muñeca + codo (2 cámaras) → IK de 6 ejes → joint1..6 ══
+                    if teleop_v2 is not None and estado["camara_activa"]:
+                        _t_v2 = time.perf_counter()
+                        _dt_v2 = None if t_prev_v2 is None else min(_t_v2 - t_prev_v2, 0.1)
+                        t_prev_v2 = _t_v2
+                        _obs_a = None
+                        if resultado_pose.pose_landmarks:
+                            _mano_px = None
+                            if resultado is not None and resultado.multi_hand_landmarks:
+                                _mano_px = np.array([[_l.x * ANCHO_CAM, _l.y * ALTO_CAM]
+                                                     for _l in resultado.multi_hand_landmarks[0].landmark])
+                            _obs_a = _ObsV2(resultado_pose.pose_landmarks, frame_depth, intr_v2_a,
+                                            mano_lm=_mano_px, t=_t_v2)
+                        _obs_b = None
+                        if ent_b is not None and intr_v2_b is not None and ent_b[0] is not None:
+                            _obs_b = _ObsV2(ent_b[0], ent_b[2], intr_v2_b, t=_t_v2)
+                        _mano_v2 = None
+                        if globals().get("TELEOP_FR5_PRONO", "hands") == "hands" and resultado is not None \
+                                and resultado.multi_hand_world_landmarks:
+                            _hw = resultado.multi_hand_world_landmarks[0]
+                            _mano_v2 = (_lm_hand(_hw, LM_CORAZON_MCP) - _lm_hand(_hw, LM_MUNECA),
+                                        _lm_hand(_hw, LM_MENIQUE_MCP) - _lm_hand(_hw, LM_INDICE_MCP))
+                        _q_v2, _info_v2 = teleop_v2.actualizar(
+                            {"A": _obs_a, "B": _obs_b}, _t_v2, mano=_mano_v2,
+                            q_actual=[float(datos.ctrl[_i]) for _i in range(6)], dt=_dt_v2)
+                        _est_v2 = _info_v2.get("estado", "?")
+                        if _q_v2 is not None and _est_v2 in ("exacta", "aprox", "transicion", "bloqueado"):
+                            _enviar_brazo((0, 1, 2, 3, 4, 5), [float(_v) for _v in _q_v2])
+                            brazo_imit_activo = True
+                        if _est_v2 == "calibrando":
+                            _txt_v2 = (f"CALIBRANDO HUESOS {_info_v2.get('progreso', 0)}/{CALIB_HUESOS_FRAMES}"
+                                       " - manten T-pose (brazo estirado)")
+                            _col_v2 = (0, 200, 255)
+                        else:
+                            _txt_v2 = (f"BRAZO v2: {_est_v2.upper()}  rama={_info_v2.get('rama')}  "
+                                       f"err={100 * (_info_v2.get('error') or 0):.1f}cm")
+                            _col_v2 = {"exacta": (0, 255, 0), "aprox": (0, 200, 255),
+                                       "transicion": (255, 200, 0)}.get(_est_v2, (0, 0, 255))
+                        cv2.putText(frame_bgr, _txt_v2, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, _col_v2, 1)
+                        cv2.putText(frame_bgr, "fusion: " + str(_info_v2.get("fuentes", ""))[:70],
+                                    (10, ALTO_CAM - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                        if globals().get("TELEOP_FR5_DEBUG", True) and _t_v2 - t_ult_print_v2 >= DEBUG_ANGULOS_CADA_S:
+                            t_ult_print_v2 = _t_v2
+                            _qtxt = "  ".join(f"{_v:+.2f}" for _v in _q_v2) if _q_v2 is not None else "-"
+                            print(f"[TELEOP v2] {_est_v2:10s} rama={_info_v2.get('rama')} "
+                                  f"err={100 * (_info_v2.get('error') or 0):4.1f}cm  q=[{_qtxt}]  "
+                                  f"{_info_v2.get('motivo', '')}  | {_info_v2.get('fuentes', '')}")
+
                     # — Teclado Avanzado (usamos waitKeyEx para captar flechas) —
                     key = cv2.waitKeyEx(1)
                     if perfil is not None:
@@ -1803,7 +1924,15 @@ def main():
                         roll_ref, refs_roll, d_prev = None, [], 0.0
                         if MODO_BRAZO == "imitacion":
                             est_brazo.iniciar_calibracion()
-                            _pose_A = globals().get("POSE_BRAZO_ACTIVAR")
+                            if teleop_v2 is not None:
+                                # v2: calibra los huesos con su propia fusión y arranca la IK desde
+                                # donde esté el brazo (no se mueve a la T-pose ni a POSE_BRAZO_ACTIVAR)
+                                teleop_v2.iniciar_calibracion()
+                                teleop_v2.ik.q = None
+                                t_prev_v2 = None
+                                print("🦾 [A] TELEOP v2: calibrando huesos (T-pose, brazo estirado) "
+                                      f"~{CALIB_HUESOS_FRAMES} fotogramas; el FR5 sale de su postura actual.")
+                            _pose_A = globals().get("POSE_BRAZO_ACTIVAR") if teleop_v2 is None else None
                             if _pose_A is not None:
                                 # 9-oct: pose fija al pulsar [A] (config.POSE_BRAZO_ACTIVAR). Se
                                 # sujeta mientras calibras la T-pose; al empezar a imitarte, el

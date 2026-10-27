@@ -1095,3 +1095,59 @@ if SOPORTE_HOMBROS:
         "azimut":    60,
         "elevacion": -22,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TELEOPERACIÓN FR5 v2 (27-oct): muñeca + codo con las DOS cámaras → IK analítica de 6 ejes
+# (skill_shield/teleop_fr5). Pegado al FINAL de config.py: manda sobre lo de arriba.
+# ═══════════════════════════════════════════════════════════════════════════
+# True  → el brazo lo mueve el módulo nuevo (joint1..6 a la vez; el antiguo PASO 2-7 queda
+#         desactivado, incluida la pronosupinación por joint6).
+# False → todo exactamente como antes.
+TELEOP_FR5_V2 = True
+
+# Escala humano → robot. None = automática: tu brazo estirado = TELEOP_FR5_FRACCION del
+# alcance del FR5+OrcaHand (≈1,65 con un brazo de 0,56 m). Un valor fijo (p. ej. 1.2) mueve
+# el robot 1,2 m por cada metro tuyo: menos amplificación, menos alcance.
+TELEOP_FR5_ESCALA   = None
+TELEOP_FR5_FRACCION = 0.85
+
+# Altura mínima (m, mundo del MJCF) de la articulación de la muñeca de la OrcaHand. None =
+# suelo + 0.25 con el soporte de hombros, o ARM_Z_MINIMA con la peana.
+TELEOP_FR5_Z_MIN = None
+
+# Límites articulares extra (rad) por joint (0..5), estrechando los reales del FR5 (ya con 5°
+# de margen). Ej.: {1: (-2.4, 1.0)} impide que el hombro suba más de lo que sube un humano.
+TELEOP_FR5_LIMITES = {2: (-2.53, 2.53)}      # codo: ±145° como el humano
+
+# Velocidades (rad/s) y aceleraciones (rad/s²) del comando continuo con v2 (el FR5 admite
+# 3,15 rad/s). Con la escala 1,65 el robot debe ir 1,65 veces más rápido que tu mano.
+TELEOP_FR5_V_MAX     = 3.0      # tope del propio módulo (lo que no llega, se queda atrás, nunca salta)
+TELEOP_FR5_SUAVE_VEL = 2.5      # GeneradorSuave (hilo de física), por joint
+TELEOP_FR5_SUAVE_ACEL = 20.0
+
+# Fusión de cámaras (ver fusion_muneca_codo.Parametros): ángulo del antebrazo respecto al rayo
+# de la cámara por debajo del cual esa cámara NO ve bien codo y muñeca (escorzo / palma delante)
+TELEOP_FR5_ESCORZO_DEG = (20.0, 40.0)
+TELEOP_FR5_HOLD_S      = 0.8    # s sin ver una articulación antes de darla por perdida
+
+# Pronosupinación: "hands" = dirección índice→meñique de MediaPipe Hands (cámara A);
+# "fija" = se mantiene la del inicio (útil si Hands va mal con el guante puesto)
+TELEOP_FR5_PRONO = "hands"
+TELEOP_FR5_ROLL_RANGO_DEG = 120.0   # pronosupinación máxima a cada lado del neutro de la calibración
+
+# ── POSTURA HUMANA DEL ROBOT (27-oct, 2ª ronda) ──────────────────────────────────────────
+# De las 8 configuraciones con las que el FR5 llega a un mismo punto solo una se parece a un
+# brazo humano; las otras tienen la muñeca volteada (joint5 < 0, joint4 girado ~180°), el codo
+# al revés o el hombro dado la vuelta, y al pasar de una a otra el brazo "da vueltas". Con
+# True el robot solo adopta posturas humanas (ik_teleop.PosturaHumana):
+#   · codo (joint3) solo hacia el lado del bíceps (se decide solo; TELEOP_FR5_CODO_SIGNO = ±1 lo fija), 0…145°
+#   · muñeca: |joint4| ≤ MUNECA_DEG[0], |joint5 − 90°| ≤ MUNECA_DEG[1]  (0 / 90° = mano alineada)
+#   · hombro: el brazo del robot dentro del cono del hombro humano (HOMBRO_AZ_* de arriba)
+# Si una orientación de la mano no es alcanzable con una muñeca humana, el robot sigue la
+# posición exacta y deja la orientación lo más cerca posible (HUD: APROX), sin dar la vuelta.
+TELEOP_FR5_POSTURA_HUMANA = True
+TELEOP_FR5_CODO_SIGNO     = None
+TELEOP_FR5_MUNECA_DEG     = (80.0, 60.0)
+
+TELEOP_FR5_DEBUG = True          # imprime estado/rama/error cada DEBUG_ANGULOS_CADA_S

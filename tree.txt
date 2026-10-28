@@ -93,12 +93,15 @@
 │   │   └── wrist3_Link.STL
 │   └── mjcf
 │       ├── decoracion
+│       │   ├── crear_soporte_hombros.py
 │       │   ├── deco_assets.xml
+│       │   ├── deco_brazo_fr5.xml
 │       │   ├── deco_escena_base.xml
 │       │   ├── deco_mesa.xml
 │       │   ├── deco_taladro_peana.xml
 │       │   ├── deco_taladro_techo.xml
 │       │   ├── LEEME.md
+│       │   ├── soporte_hombros.xml
 │       │   └── texturas
 │       │       ├── cinta_seguridad.png
 │       │       ├── panel_perforado.png
@@ -2600,6 +2603,7 @@
 ├── skill_shield
 │   ├── brazo
 │   │   ├── angulos_humano.py
+│   │   ├── base_brazo.py
 │   │   ├── control_suave.py
 │   │   ├── hibrido.py
 │   │   ├── ik_codo_muneca.py
@@ -2610,6 +2614,7 @@
 │   │   ├── limites_humanos.py.bak_arctos
 │   │   └── __pycache__
 │   │       ├── angulos_humano.cpython-312.pyc
+│   │       ├── base_brazo.cpython-312.pyc
 │   │       ├── control_suave.cpython-312.pyc
 │   │       ├── hibrido.cpython-312.pyc
 │   │       ├── ik_codo_muneca.cpython-312.pyc
@@ -2682,6 +2687,22 @@
 │   │       ├── hilo_fisica.cpython-312.pyc
 │   │       ├── __init__.cpython-312.pyc
 │   │       └── objetos.cpython-312.pyc
+│   ├── teleop_fr5
+│   │   ├── cinematica.py
+│   │   ├── fusion_muneca_codo.py
+│   │   ├── ik_teleop.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── cinematica.cpython-312.pyc
+│   │   │   ├── fusion_muneca_codo.cpython-312.pyc
+│   │   │   ├── ik_teleop.cpython-312.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── retargeting.cpython-312.pyc
+│   │   │   ├── simulador.cpython-312.pyc
+│   │   │   └── teleop_brazo.cpython-312.pyc
+│   │   ├── retargeting.py
+│   │   ├── simulador.py
+│   │   └── teleop_brazo.py
 │   └── vision
 │       ├── camara_oak.py
 │       ├── detectores.py
@@ -2699,7 +2720,6 @@
 │       │   └── recorte_mano.cpython-312.pyc
 │       └── recorte_mano.py
 ├── Skill_Shield_Nivel_6.py
-├── Skill_Shield_Nivel_6.py.bak_arctos
 ├── tablero_charuco.png
 ├── taladro
 │   ├── drill.obj
@@ -2712,6 +2732,7 @@
 │   ├── preparando_taladro.py
 │   └── textures_detailed.zip
 ├── test_ia_mano.py
+├── tests_teleop_fr5.py
 └── tree.txt
 
-291 directories, 2424 files
+293 directories, 2443 files

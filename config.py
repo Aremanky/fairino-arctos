@@ -1151,3 +1151,42 @@ TELEOP_FR5_CODO_SIGNO     = None
 TELEOP_FR5_MUNECA_DEG     = (80.0, 60.0)
 
 TELEOP_FR5_DEBUG = True          # imprime estado/rama/error cada DEBUG_ANGULOS_CADA_S
+
+# ── CORRECCIONES TRAS EL ANÁLISIS DEL VÍDEO (28-oct, 2ª parte) ─────────────────────────────
+# Todo automático, sin medir nada a mano:
+#  · TELEOP_FR5_AUTO_EXTRINSECA: al pulsar [A] se comprueba que A y B coinciden con los puntos
+#    de tu cuerpo; si no (el registro del 28-oct dio 36-46 cm: alguna cámara se había movido),
+#    la extrínseca se recalcula sola con tu cuerpo (unos segundos moviendo los brazos) y se
+#    guarda en camaras_extrinsecas.json (la anterior queda como .bak_*). Ya no hace falta el
+#    tablero ni calibrar_extrinseca.py. TELEOP_FR5_VIGILAR_EXTRINSECA: si durante la
+#    teleoperación A y B dejan de coincidir (alguien mueve una cámara), se recalibra sola.
+#  · TELEOP_FR5_TRIANGULAR: hombro, codo y muñeca salen de los RAYOS de las dos cámaras (56° y
+#    2 m entre ellas); el estéreo de cada OAK queda como apoyo (falla sobre ropa oscura).
+#  · TELEOP_FR5_VERTICAL_AUTO / TELEOP_FR5_ARRIBA_REF = "calibrada": la vertical sale de tu
+#    tronco en la T-pose, no del eje Y de la cámara A (que puede estar inclinada).
+#  · TELEOP_FR5_IK = "diferencial": IK que parte de la postura anterior, una sola rama, sin
+#    transiciones; la posición de la muñeca manda y orientación/codo/límites humanos son
+#    coste. "analitica" = la de antes.
+#  · TELEOP_FR5_SIN_PIPELINE_ANTIGUO: con la v2 no se calcula el brazo antiguo (FusorBrazo,
+#    ángulos del HUD): era trabajo duplicado en cada fotograma.
+TELEOP_FR5_AUTO_EXTRINSECA     = True
+TELEOP_FR5_VIGILAR_EXTRINSECA  = True
+TELEOP_FR5_TRIANGULAR          = True
+TELEOP_FR5_VERTICAL_AUTO       = True
+TELEOP_FR5_ARRIBA_REF          = "calibrada"
+TELEOP_FR5_IK                  = "diferencial"
+TELEOP_FR5_ALCANCE_MAX         = 0.88       # fracción máx. del alcance del FR5 que se pide (antes 0,92)
+TELEOP_FR5_SIN_PIPELINE_ANTIGUO = True
+# Fluidez (28-oct, tarde): la fusión + IK de la v2 corren en un hilo aparte, solapadas con la
+# espera de la cámara y MediaPipe. El comando del brazo sale 1 fotograma más tarde (~35 ms).
+# False = en el propio bucle, como antes.
+TELEOP_FR5_EN_PARALELO = True
+
+# ── DIAGNÓSTICO: separar medida de IK (28-oct) ─────────────────────────────────────────
+# [R] con la imitación activa graba TELEOP_FR5_DIAG_S segundos quieto y saca el informe de la
+# medida (ruido, huesos, ángulos, A contra B, vertical) en terminal y en diagnosticos/*.npz.
+# La etiqueta va en el nombre del archivo: cámbiala para grabar otras poses ("colgando",
+# "arriba"...) y comparar la elevación medida con la real (≈10° / 90° / 170°).
+# La parte de la IK se prueba sin hardware:  python -m skill_shield.teleop_fr5.diagnostico ik
+TELEOP_FR5_DIAG_S        = 10.0
+TELEOP_FR5_DIAG_ETIQUETA = "tpose"

@@ -40,6 +40,11 @@ class HiloFisica(threading.Thread):
         self.activo = True
         self.factor = 0.0          # tiempo simulado / tiempo real (1.00 = tiempo real)
         self.espera_candado = 0.0  # FLUIDEZ: s que el bucle principal esperó a recuperar el candado
+        # 28-oct (latencia): el bucle principal esperaba 40-49 ms por vuelta a que este hilo
+        # terminara su lote de mj_step + visor.sync() con el candado cogido. Ahora, en cuanto el
+        # bucle principal pide el candado, este hilo corta el lote tras el mj_step en curso (lo
+        # que falte se simula en la siguiente vuelta) y no hace el sync de esa vuelta.
+        self._quiere_principal = False
 
     def empezar(self):
         """Lo llama el bucle principal: se queda el candado y arranca el hilo."""
@@ -60,7 +65,9 @@ class HiloFisica(threading.Thread):
             yield
         finally:
             _t_esp = time.perf_counter()
+            self._quiere_principal = True
             self.lock.acquire()
+            self._quiere_principal = False
             # FLUIDEZ: si la física estaba a mitad de un lote de mj_step, el bucle de la
             # cámara se queda aquí esperando; lo mide PerfilBucle.
             self.espera_candado += time.perf_counter() - _t_esp
@@ -82,13 +89,17 @@ class HiloFisica(threading.Thread):
                 deuda = min(deuda + (ahora - t_ant), FISICA_RETRASO_MAX)
                 t_ant = ahora
                 n = int(deuda / ts)
+                hechos = 0
                 for _ in range(n):
+                    if self._quiere_principal:             # 28-oct: el bucle principal espera
+                        break
                     if self.antes_de_paso is not None:     # PASO 7.1: comando continuo
                         self.antes_de_paso(self.modelo, self.datos, ts)
                     mujoco.mj_step(self.modelo, self.datos)
-                deuda   -= n * ts
-                sim_med += n * ts
-                if self.visor.is_running():
+                    hechos += 1
+                deuda   -= hechos * ts
+                sim_med += hechos * ts
+                if not self._quiere_principal and self.visor.is_running():
                     self.visor.sync()
             if ahora - t_med >= 1.0:
                 self.factor = sim_med / (ahora - t_med)

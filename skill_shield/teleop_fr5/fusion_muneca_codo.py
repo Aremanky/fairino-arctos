@@ -48,6 +48,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+_I3 = np.eye(3)
+
 # Índices de MediaPipe Pose
 PS_HOMBRO_IZQ, PS_HOMBRO_DER = 11, 12
 PS_CODO_IZQ, PS_CODO_DER = 13, 14
@@ -79,6 +81,15 @@ class Parametros:
     hombro_hacia_torso: float = 0.6    # el hombro se mide en el pecho (la mano tapa el hombro)
     arriba_ref: str = "camara"         # "camara" | "caderas"
     codo_sigma_fiable: float = 0.06    # m: σ del codo por debajo de la cual no se reconstruye
+    # ── triangulación A+B (28-oct): con las dos cámaras viendo la articulación, su posición sale
+    #    de los RAYOS de los dos píxeles (cámaras separadas ~56° y 2 m: mucho más precisa que el
+    #    estéreo de cada OAK a 2 m, y no depende de la ropa); el estéreo queda como apoyo débil ──
+    triangular: bool = True
+    tri_ang_min_deg: float = 8.0       # ángulo mínimo entre los dos rayos (si no, mal condicionado)
+    tri_sigma_z_min: float = 0.08      # m: el estéreo como apoyo a lo largo del rayo, nunca más fino que esto
+    tri_res_max: float = 3.5           # residuo máx. de cada rayo (en σ) para aceptar la triangulación
+    z_nominal: float = 2.0             # m: profundidad provisional de un rayo sin estéreo ni predicción
+    arriba_fija: tuple = None          # vertical calibrada (marco A); la usa arriba_ref = "calibrada"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -321,6 +332,8 @@ def observar_camara(obs: ObservacionCamara, cam: Camara, brazo: str, par: Parame
             z_uso = z
         elif z_prev is not None:
             z_uso = z_prev
+        elif par.triangular:
+            z_uso = par.z_nominal          # solo rayo: vale para triangular con la otra cámara
         else:
             return None                    # sin profundidad ni predicción no hay punto
         p = r * z_uso
@@ -531,6 +544,7 @@ class Fusor2Cam:
                    for k in self.ARTICULACIONES}
         self.ultimo_codo_rel = None               # último vector hombro→codo fiable
         self.resumen = "-"
+        self.diag = {}                            # diagnóstico del último fotograma (ver actualizar)
         self.t_ult = None
         self.rechazos = {k: 0 for k in self.ARTICULACIONES}   # rechazos χ² consecutivos
         self.max_rechazos = 3                     # tras estos, el filtro se reinicia a la medida
@@ -602,10 +616,28 @@ class Fusor2Cam:
                 notas.append(f"{nombre}:" + ",".join(nn))
 
         fuentes = {}
+        triangulados = set()
+        # Diagnóstico (no cambia la fusión): por articulación, la medida de cada cámara en el
+        # marco A (con o sin profundidad), el χ² entre cámaras y la cámara elegida si discrepan.
+        # Lo leen diagnostico.RegistroQuieto y el HUD.
+        self.diag = {}
         for art, lista in medidas.items():
             kf = self.kf[art]
             if not lista:
                 continue
+            self.diag[art] = dict(
+                meds={n: (self.cams[n].a_A(m.p), bool(m.tiene_z), bool(m.sospechosa)) for n, m in lista},
+                d2=None, elegida=None, tri=None)
+            # ── 1º) triangulación con los rayos de las dos cámaras ──
+            if par.triangular and len({n for n, _ in lista}) >= 2:
+                tri = self._triangular(lista)
+                if tri is not None:
+                    X, S_X, res_max = tri
+                    self.diag[art]["tri"] = res_max
+                    ok = self._actualizar_kf(art, X, S_X, t, True)
+                    triangulados.add(art)
+                    fuentes[art] = "+".join(n for n, _ in lista) + ":T" + ("" if ok else "x")
+                    continue
             hay_buena = any(m.tiene_z and not m.sospechosa for _, m in lista)
             # modo de cada medida: buena → normal; sospechosa → rayo si hay otra buena, si no
             # ensanchada; sin profundidad → rayo
@@ -634,6 +666,7 @@ class Fusor2Cam:
                     d2 = float(d @ np.linalg.solve(Sa + Sb, d))
                 except np.linalg.LinAlgError:
                     d2 = 0.0
+                self.diag[art]["d2"] = d2
                 if d2 > par.chi2_gate and kf.p is not None:
                     # elegir la más compatible con la predicción
                     cands = []
@@ -646,6 +679,7 @@ class Fusor2Cam:
                         cands.append((dm, nombre, pA, SA, modo))
                     cands.sort(key=lambda c: c[0])
                     _, nombre, pA, SA, modo = cands[0]
+                    self.diag[art]["elegida"] = nombre
                     ok = self._actualizar_kf(art, pA, SA, t, modo != "rayo")
                     fuentes[art] = f"{etiqueta}!{nombre}" + ("" if ok else "x")
                     continue
@@ -716,13 +750,75 @@ class Fusor2Cam:
             "torso": torso,
             "codo_reconstruido": codo_rec,
             "fuentes": self.resumen,
+            "triangulado": frozenset(triangulados),
         }
+
+    def _triangular(self, lista):
+        """Punto 3D (marco A) a partir de los rayos de dos o más cámaras: mínimos cuadrados de
+        la distancia perpendicular a cada rayo, pesada por su σ angular (σ_pix/f, peor con
+        visibilidad o escorzo) × distancia; el estéreo de cada cámara, si es bueno, entra como
+        apoyo débil a lo largo de su rayo. Devuelve (X, covarianza, residuo máx. en σ) o None si
+        los rayos son casi paralelos, el punto queda detrás de una cámara o los rayos no se
+        cortan (un landmark mal en una de las dos: se deja a la lógica de una cámara)."""
+        par = self.par
+        rayos = []
+        for nombre, m in lista:
+            cam = self.cams[nombre]
+            d = cam.R @ m.rayo
+            d = d / math.sqrt(float(d @ d))
+            z_ref = max(math.sqrt(float(m.p @ m.p)), 1e-3)
+            pz = cam.a_A(m.p) if (m.tiene_z and not m.sospechosa) else None
+            sz = max(m.s_z, par.tri_sigma_z_min) if pz is not None else None
+            rayos.append((cam.t, d, m.s_lat / z_ref, z_ref, pz, sz, np.outer(d, d)))
+        # ángulo entre rayos (el mayor de los pares)
+        cmin = 1.0
+        for i in range(len(rayos)):
+            for j in range(i + 1, len(rayos)):
+                cmin = min(cmin, abs(float(rayos[i][1] @ rayos[j][1])))
+        if math.degrees(math.acos(min(1.0, cmin))) < par.tri_ang_min_deg:
+            return None
+        X = None
+        for _ in range(2):
+            A = np.zeros((3, 3))
+            b = np.zeros(3)
+            for c, d, s_ang, z_ref, pz, sz, D in rayos:
+                if X is not None:
+                    v = X - c
+                    dist = math.sqrt(float(v @ v))
+                else:
+                    dist = max(z_ref, 0.3)
+                w = 1.0 / max(s_ang * dist, 1e-4) ** 2
+                P = _I3 - D
+                A += w * P
+                b += w * (P @ c)
+                if pz is not None:
+                    wz = 1.0 / (sz * sz)
+                    A += wz * D
+                    b += wz * (D @ pz)
+            try:
+                X = np.linalg.solve(A, b)
+            except np.linalg.LinAlgError:
+                return None
+        res_max = 0.0
+        for c, d, s_ang, z_ref, pz, sz, D in rayos:
+            v = X - c
+            prof = float(v @ d)
+            if prof < par.z_min:
+                return None
+            perp = v - prof * d
+            sig = max(s_ang * math.sqrt(float(v @ v)), 1e-4)
+            res_max = max(res_max, math.sqrt(float(perp @ perp)) / sig)
+        if res_max > par.tri_res_max:
+            return None
+        return X, np.linalg.inv(A), res_max
 
     def _marco_torso(self, S):
         """(derecha, arriba, delante, lado) en el marco A, como en angulos_humano.py."""
         lado = 1.0 if self.brazo == "derecho" else -1.0
         S2 = self.kf["hombro2"].p
         arriba = None
+        if self.par.arriba_ref == "calibrada" and self.par.arriba_fija is not None:
+            arriba = np.asarray(self.par.arriba_fija, dtype=float)
         if self.par.arriba_ref == "caderas":
             C, C2 = self.kf["cadera"].p, self.kf["cadera2"].p
             if S2 is not None and C is not None and C2 is not None:
@@ -778,10 +874,12 @@ class CalibradorHuesos:
         self.h1, self.h2 = [], []
         self.fijas = None
         self.calibrando = False
+        self.rechazados, self.relajado = 0, False
 
     def iniciar(self):
         if self.manual is None:
             self.h1, self.h2, self.fijas, self.calibrando = [], [], None, True
+            self.rechazados, self.relajado = 0, False
 
     @property
     def longitudes(self):
@@ -791,10 +889,31 @@ class CalibradorHuesos:
     def progreso(self):
         return len(self.h1)
 
-    def alimentar(self, S, E, W):
+    FLEX_MAX_DEG = 25.0          # solo con el brazo (casi) recto: así el codo se ve bien
+    RATIO_ANTEBRAZO = (0.70, 1.02)   # antebrazo / brazo de una persona (el registro del 28-oct dio
+                                     # 1.03: brazo más corto que antebrazo = codo mal medido)
+
+    N_RELAJAR = 90               # fotogramas rechazados tras los que se vuelve al criterio antiguo
+
+    def alimentar(self, S, E, W, fiable=True):
+        """fiable=False (p. ej. el codo no salió triangulado con las dos cámaras) → no cuenta.
+        Si tras N_RELAJAR fotogramas los filtros nuevos lo rechazan todo (medida muy mala), se
+        relajan (solo bandas de longitud, como antes) y se avisa: mejor calibrar algo que nada."""
         if not self.calibrando:
             return
         l1, l2 = float(np.linalg.norm(E - S)), float(np.linalg.norm(W - E))
+        if l1 < 1e-6 or l2 < 1e-6:
+            return
+        flex = math.degrees(math.acos(float(np.clip((E - S) @ (W - E) / (l1 * l2), -1.0, 1.0))))
+        estricto = fiable and flex <= self.FLEX_MAX_DEG and \
+            self.RATIO_ANTEBRAZO[0] <= l2 / l1 <= self.RATIO_ANTEBRAZO[1]
+        if not estricto and not self.relajado:
+            self.rechazados += 1
+            if self.rechazados >= self.N_RELAJAR:
+                self.relajado = True
+                print("⚠️  Huesos: la medida no da un brazo recto y proporcionado (¿extrínseca mal, ropa "
+                      "oscura?); calibro con el criterio antiguo")
+            return
         if self.BANDA_BRAZO[0] <= l1 <= self.BANDA_BRAZO[1] and self.BANDA_ANTEBRAZO[0] <= l2 <= self.BANDA_ANTEBRAZO[1]:
             self.h1.append(l1)
             self.h2.append(l2)

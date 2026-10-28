@@ -193,6 +193,187 @@ def test_objetivo_imposible_no_choca():
         assert info["estado"] in ("aprox", "bloqueado", "exacta", "transicion")
 
 
+def test_diagnostico_ik_trayectoria_limpia():
+    """Separar medida de IK: la trayectoria limpia entra directamente en retargeting + IK (sin
+    cámaras) con la config de la app. Comprueba que el diagnóstico corre, que todo fotograma
+    tiene estado, que el robot no se sale de límites ni salta, y que donde hay solución exacta
+    el error frente a la verdad es nulo (sin ruido, el error solo puede venir de la IK)."""
+    from skill_shield.teleop_fr5.diagnostico import construir_teleop, diagnosticar_ik
+    teleop, q0, _ = construir_teleop()
+    res, serie = diagnosticar_ik(0.0, 0.0, fps=10.0, teleop=teleop, q0=q0, verbose=False)
+    assert res["n"] > 250
+    assert sum(res["estados"].values()) == res["n"]
+    assert set(res["estados"]) <= {"exacta", "aprox", "transicion", "bloqueado", "sin_medida"}
+    assert res["dq_max"] <= 3.0 * 0.1 + 1e-6               # límite de velocidad a 10 FPS
+    ex = [x for x in serie if x["estado"] == "exacta" and x["fase"] != "arranque" and "err_real" in x]
+    assert len(ex) > 0.5 * res["n"]
+    assert np.median([x["err_real"] for x in ex]) < 1e-3
+
+
+def test_diagnostico_ruido_empeora_la_ik():
+    """Con ruido en la medida, el error frente a la verdad crece (lo que mide el barrido)."""
+    from skill_shield.teleop_fr5.diagnostico import construir_teleop, diagnosticar_ik
+    t0, q0, _ = construir_teleop()
+    limpio, _ = diagnosticar_ik(0.0, 0.0, teleop=t0, q0=q0, verbose=False)
+    t1, q1, _ = construir_teleop()
+    ruidoso, _ = diagnosticar_ik(2.0, 4.0, teleop=t1, q0=q1, verbose=False)
+    assert ruidoso["err_real_med"] > limpio["err_real_med"] + 0.01
+
+
+def test_registro_quieto_con_camaras_sinteticas():
+    """[R] de la app: 10 s quieto en T-pose con las cámaras sintéticas → informe coherente
+    (huesos ≈ reales, elevación ≈ 90°, A y B comparadas) y archivo .npz que se puede releer."""
+    import tempfile
+    from skill_shield.teleop_fr5.diagnostico import RegistroQuieto, cargar, construir_teleop, informe_quieto
+    from skill_shield.teleop_fr5.simulador import BrazoHumanoSintetico, CamaraSintetica, cargar_extrinsecas_repo
+    rng = np.random.default_rng(3)
+    brazo = BrazoHumanoSintetico()
+    R_ab, t_ab = cargar_extrinsecas_repo()
+    ca, cb = CamaraSintetica("A", rng=rng), CamaraSintetica("B", R_ab, t_ab, rng=rng)
+    teleop, q0, _ = construir_teleop()
+    teleop.fusor.cams = {"A": ca.cam, "B": cb.cam}
+    S, E, W, _ = brazo.pose(0.5)                                  # T-pose
+    with tempfile.TemporaryDirectory() as tmp:
+        reg = RegistroQuieto(10.0, carpeta=tmp)
+        reg.iniciar(0.0)
+        k, fin = 0, False
+        while not fin:
+            t = k * 0.1
+            obs = {"A": ca.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, t),
+                   "B": cb.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, t)}
+            teleop.actualizar(obs, t, q_actual=q0, dt=0.1)
+            fin = reg.alimentar(t, teleop)
+            k += 1
+        assert reg.ruta and os.path.exists(reg.ruta)
+        inf = informe_quieto(cargar(reg.ruta), imprimir=False)
+    assert inf["n"] >= 100 and inf["frac_medida"] > 0.9
+    assert abs(inf["huesos"]["brazo"][0] - 0.30) < 0.03 and abs(inf["huesos"]["antebrazo"][0] - 0.26) < 0.03
+    assert abs(inf["angulos"]["elevación"]["med"] - 90.0) < 8.0
+    assert abs(inf["angulos"]["azimut"]["med"] - 90.0) < 8.0
+    assert all(a in inf["ab"] for a in ("hombro", "codo", "muneca"))
+    assert inf["vertical_deg"] < 5.0
+    for a in ("hombro", "codo", "muneca"):
+        assert inf["arts"][a]["rms_mm"] < 60.0
+
+
+def test_ik_diferencial_una_rama_sin_transiciones():
+    """IK diferencial (28-oct): con la trayectoria limpia y con ruido + saltos A↔B, el robot
+    nunca hace transiciones (salvo el arranque) ni se bloquea, no salta entre fotogramas y la
+    orientación no se dispara (con la IK analítica, 2 cm de ruido ya daban ~30 transiciones)."""
+    from skill_shield.teleop_fr5.diagnostico import construir_teleop, diagnosticar_ik
+    for ruido, saltos, min_exacta in ((0.0, 0.0, 70.0), (2.0, 5.0, 40.0)):
+        teleop, q0, _ = construir_teleop()
+        assert teleop.cfg.ik == "diferencial"
+        res, serie = diagnosticar_ik(ruido, saltos, teleop=teleop, q0=q0, verbose=False)
+        tras = [x for x in serie if x["fase"] != "arranque" and x["estado"] == "transicion"]
+        assert len(tras) <= 3, f"σ={ruido}: transiciones fuera del arranque"     # solo el final del arranque
+        assert res["estados"].get("bloqueado", 0) == 0
+        assert res["pct"].get("exacta", 0) >= min_exacta, res["pct"]
+        assert res["ang_real_p95"] < 45.0
+        assert res["dq_max"] <= 3.0 * 0.1 + 1e-6
+
+
+def test_triangulacion_mejora_la_fusion():
+    """Con las dos cámaras, triangular los rayos da menos error que el estéreo de cada una."""
+    import skill_shield.teleop_fr5.simulador as sim
+    from skill_shield.teleop_fr5.fusion_muneca_codo import Parametros
+    orig = sim.Parametros
+    try:
+        err = {}
+        for tri in (False, True):
+            sim.Parametros = lambda **k: Parametros(triangular=tri, **k)
+            r, _ = sim.simular_fusion(verbose=False)
+            err[tri] = np.mean([r[f]["eW_p95"] for f in range(7)])
+    finally:
+        sim.Parametros = orig
+    assert err[True] < 0.9 * err[False], err
+
+
+def test_extrinseca_automatica_con_el_cuerpo():
+    """Extrínseca A↔B equivocada ~42 cm / ~10° (como la del registro del 28-oct): al pulsar [A]
+    se recalcula sola con los puntos del cuerpo, sin tablero, y se avisa para guardarla."""
+    import math as _m
+    from skill_shield.teleop_fr5.autocalib import _rotvec
+    from skill_shield.teleop_fr5.diagnostico import construir_teleop
+    from skill_shield.teleop_fr5.fusion_muneca_codo import Camara
+    from skill_shield.teleop_fr5.simulador import BrazoHumanoSintetico, CamaraSintetica, cargar_extrinsecas_repo
+    from skill_shield.teleop_fr5.teleop_brazo import ConfigTeleop, TeleopBrazoFR5
+    rng = np.random.default_rng(0)
+    brazo = BrazoHumanoSintetico()
+    R, t = cargar_extrinsecas_repo()
+    ca, cb = CamaraSintetica("A", rng=rng), CamaraSintetica("B", R, t, rng=rng)
+    R_mal = _rotvec(np.radians([3, 8, -4])) @ R
+    t_mal = t + np.array([-0.40, 0.03, 0.12])
+    base, q0, _ = construir_teleop()
+    guardadas = []
+    tel = TeleopBrazoFR5(cadena=base.cadena, camaras={"A": Camara("A"), "B": Camara("B", R_mal, t_mal)},
+                         cfg=ConfigTeleop(), cfg_retarget=base.retarget.cfg, entorno=base.ik.col.entorno,
+                         verbose=False, al_calibrar_extrinseca=lambda R_, t_, i: guardadas.append(i))
+    tel.iniciar_calibracion()
+    fases = []
+    for k in range(170):                  # cámaras (moviendo los brazos) → T-pose a los 12 s
+        tt = k / 10.0
+        S, E, W, _ = brazo.pose((tt + 9.0) % 21.0)
+        obs = {"A": ca.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, tt),
+               "B": cb.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, tt)}
+        q, info = tel.actualizar(obs, tt, q_actual=q0, dt=0.1)
+        fases.append(info.get("fase"))
+    cam = tel.fusor.cams["B"]
+    ang = _m.degrees(_m.acos(float(np.clip((np.trace(cam.R.T @ R) - 1) / 2, -1, 1))))
+    assert guardadas, "no se recalculó la extrínseca"
+    assert np.linalg.norm(cam.t - t) < 0.08 and ang < 3.0, (np.linalg.norm(cam.t - t), ang)
+    assert tel.calibrado and "camaras" in fases and "huesos" in fases
+    assert abs(tel.calib.longitudes[0] - 0.30) < 0.03 and abs(tel.calib.longitudes[1] - 0.26) < 0.03
+
+
+def test_teleop_en_paralelo_da_lo_mismo_un_fotograma_despues():
+    """TeleopEnParalelo (hilo aparte, fluidez): el resultado del fotograma N es exactamente el
+    que daría la versión en el bucle, solo que se recoge en la vuelta N+1."""
+    from skill_shield.teleop_fr5.diagnostico import construir_teleop
+    from skill_shield.teleop_fr5.fusion_muneca_codo import Camara, Parametros
+    from skill_shield.teleop_fr5.simulador import BrazoHumanoSintetico, CamaraSintetica, cargar_extrinsecas_repo
+    from skill_shield.teleop_fr5.teleop_brazo import ConfigTeleop, TeleopBrazoFR5, TeleopEnParalelo
+    R, t = cargar_extrinsecas_repo()
+    brazo = BrazoHumanoSintetico()
+
+    def observaciones():
+        # las cámaras sintéticas sortean el ruido de profundidad en cada lectura: cada versión
+        # recibe su propia secuencia, con la misma semilla
+        rng = np.random.default_rng(4)
+        ca, cb = CamaraSintetica("A", rng=rng), CamaraSintetica("B", R, t, rng=rng)
+        out = []
+        for k in range(80):
+            tt = k / 10.0
+            S, E, W, _ = brazo.pose(tt)
+            out.append((tt, ca.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, tt),
+                        cb.observar(S, E, W, brazo.S2, brazo.C, brazo.C2, tt)))
+        return out
+    base, q0, _ = construir_teleop()
+
+    def nuevo():
+        # sin autocalibración (su ajuste va en otro hilo y no es determinista en el tiempo)
+        return TeleopBrazoFR5(cadena=base.cadena, camaras={"A": Camara("A"), "B": Camara("B", R, t)},
+                              cfg=ConfigTeleop(longitudes_manual=(0.30, 0.26), auto_extrinseca=False,
+                                               vigilar_extrinseca=False),
+                              cfg_retarget=base.retarget.cfg, entorno=base.ik.col.entorno, verbose=False)
+    a, b = nuevo(), nuevo()
+    par = TeleopEnParalelo(b)
+    qa, qb = [], []
+    for tt, oa, ob in observaciones():
+        q, _ = a.actualizar({"A": oa, "B": ob}, tt, q_actual=q0, dt=0.1)
+        qa.append(None if q is None else q.copy())
+    for tt, oa, ob in observaciones():
+        q2, _ = par.recoger()
+        qb.append(q2)
+        par.lanzar({"A": oa, "B": ob}, tt, q_actual=q0, dt=0.1)
+    par.cerrar()
+    for k in range(1, len(qa)):
+        if qa[k - 1] is None:
+            assert qb[k] is None
+        else:
+            assert np.abs(qa[k - 1] - qb[k]).max() < 1e-12
+
+
 if __name__ == "__main__":
     import inspect
     fallos = 0

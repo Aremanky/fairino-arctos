@@ -39,27 +39,38 @@ from skill_shield.teleop_fr5.cinematica import (
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _dist_segmentos(p1, q1, p2, q2):
-    """Distancia mínima entre los segmentos p1-q1 y p2-q2 (Ericson, Real-Time Collision Detection)."""
-    d1, d2, r = q1 - p1, q2 - p2, p1 - p2
-    a, e, f = float(d1 @ d1), float(d2 @ d2), float(d2 @ r)
+    """Distancia mínima entre los segmentos p1-q1 y p2-q2 (Ericson, Real-Time Collision Detection).
+    Aritmética escalar (28-oct): se llama decenas de veces por fotograma y numpy sobre vectores
+    de 3 elementos cuesta más en sobrecarga que en cálculo."""
+    p1x, p1y, p1z = float(p1[0]), float(p1[1]), float(p1[2])
+    p2x, p2y, p2z = float(p2[0]), float(p2[1]), float(p2[2])
+    d1x, d1y, d1z = float(q1[0]) - p1x, float(q1[1]) - p1y, float(q1[2]) - p1z
+    d2x, d2y, d2z = float(q2[0]) - p2x, float(q2[1]) - p2y, float(q2[2]) - p2z
+    rx, ry, rz = p1x - p2x, p1y - p2y, p1z - p2z
+    a = d1x * d1x + d1y * d1y + d1z * d1z
+    e = d2x * d2x + d2y * d2y + d2z * d2z
+    f = d2x * rx + d2y * ry + d2z * rz
     if a <= 1e-12 and e <= 1e-12:
-        return float(np.linalg.norm(r))
+        return math.sqrt(rx * rx + ry * ry + rz * rz)
     if a <= 1e-12:
-        s, t = 0.0, float(np.clip(f / e, 0.0, 1.0))
+        s, t = 0.0, min(max(f / e, 0.0), 1.0)
     else:
-        c = float(d1 @ r)
+        c = d1x * rx + d1y * ry + d1z * rz
         if e <= 1e-12:
-            t, s = 0.0, float(np.clip(-c / a, 0.0, 1.0))
+            t, s = 0.0, min(max(-c / a, 0.0), 1.0)
         else:
-            b = float(d1 @ d2)
+            b = d1x * d2x + d1y * d2y + d1z * d2z
             den = a * e - b * b
-            s = float(np.clip((b * f - c * e) / den, 0.0, 1.0)) if den > 1e-12 else 0.0
+            s = min(max((b * f - c * e) / den, 0.0), 1.0) if den > 1e-12 else 0.0
             t = (b * s + f) / e
             if t < 0.0:
-                t, s = 0.0, float(np.clip(-c / a, 0.0, 1.0))
+                t, s = 0.0, min(max(-c / a, 0.0), 1.0)
             elif t > 1.0:
-                t, s = 1.0, float(np.clip((b - c) / a, 0.0, 1.0))
-    return float(np.linalg.norm((p1 + d1 * s) - (p2 + d2 * t)))
+                t, s = 1.0, min(max((b - c) / a, 0.0), 1.0)
+    dx = rx + d1x * s - d2x * t
+    dy = ry + d1y * s - d2y * t
+    dz = rz + d1z * s - d2z * t
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 @dataclass

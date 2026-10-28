@@ -21,6 +21,8 @@ Controles de teclado:
   [F]  Modo FINO del brazo: el robot se mueve FINO_ESCALA veces lo que te mueves tú
        (para maniobrar con herramientas). Otra vez [F] → vuelve a imitarte suavemente
   [C]  CONGELAR / descongelar el brazo (se queda quieto; la mano sigue funcionando)
+  [R]  (TELEOP_FR5_V2) Registro de diagnóstico: TELEOP_FR5_DIAG_S s quieto (T-pose) →
+       ruido de hombro/codo/muñeca, huesos, ángulos y A contra B (diagnosticos/*.npz)
   [Q]  Salir
 
 Dependencias:
@@ -370,7 +372,7 @@ def main():
 
     print("\n  Controles: [A] Activar | [S] Standby | [G] Grabar | "
           "[E] Entrenar tarea actual | [Shift+E] Entrenar todas | [P] Pelota ON/OFF | [I] Modo IA (red neuronal) | "
-          "[M] Demo Maniobra Autónoma | [4] Taladro | [5] Demo taladro | [Q] Salir\n")
+          "[M] Demo Maniobra Autónoma | [4] Taladro | [5] Demo taladro | [R] Diagnóstico T-pose (v2) | [Q] Salir\n")
 
     # Asegurar que el destornillador empieza oculto (fuera de escena)
     _ocultar_destornillador(modelo, datos)
@@ -906,10 +908,25 @@ def main():
                         intr_v2_a = _IntrV2.desde_focal(f_px_cam, ANCHO_CAM, ALTO_CAM)
                     _cams_v2 = {"A": _CamV2("A")}
                     intr_v2_b = None
-                    if fusor_b is not None:
-                        _cams_v2["B"] = _CamV2("B", _ext[0], _ext[1])
+                    _auto_ext_v2 = bool(globals().get("TELEOP_FR5_AUTO_EXTRINSECA", True))
+                    if cam_b is not None and (fusor_b is not None or _auto_ext_v2):
+                        # 28-oct: con la extrínseca automática, B entra aunque no haya
+                        # camaras_extrinsecas.json (o no corresponda): se calcula con tu cuerpo al pulsar [A]
+                        if fusor_b is not None:
+                            _cams_v2["B"] = _CamV2("B", _ext[0], _ext[1])
+                        else:
+                            _cams_v2["B"] = _CamV2("B")
+                            print("📐 Cámara B sin extrínseca válida: se calculará sola con tu cuerpo al pulsar [A]")
                         intr_v2_b = (_IntrV2.desde_K(cam_b.K, ANCHO_CAM, ALTO_CAM) if cam_b.K is not None
                                      else _IntrV2.desde_focal(cam_b.f_px, ANCHO_CAM, ALTO_CAM))
+                    _mxid_a_v2 = device.getMxId()
+                    _mxid_b_v2 = cam_b.mxid if cam_b is not None else None
+
+                    def _guardar_ext_v2(_R, _t, _inf):
+                        from skill_shield.teleop_fr5.autocalib import guardar_extrinsecas
+                        from skill_shield.vision.multicamara import _ruta_extrinsecas
+                        _r = guardar_extrinsecas(_ruta_extrinsecas(), _R, _t, _inf, _mxid_a_v2, _mxid_b_v2)
+                        print(f"💾 Extrínseca A↔B guardada en {os.path.basename(_r)} (la anterior, en .bak_*)")
                     if globals().get("SOPORTE_HOMBROS", False):
                         _ent_v2 = entorno_soporte_hombros(SOPORTE_SUELO_Z)
                         _z_min_v2 = SOPORTE_SUELO_Z + 0.25
@@ -921,18 +938,25 @@ def main():
                     teleop_v2 = TeleopBrazoFR5(
                         RUTA_XML, _cams_v2,
                         cfg=ConfigTeleop(brazo=BRAZO_HUMANO, longitudes_manual=LONG_BRAZO_MANUAL,
-                                         n_calibracion=CALIB_HUESOS_FRAMES),
+                                         n_calibracion=CALIB_HUESOS_FRAMES,
+                                         ik=str(globals().get("TELEOP_FR5_IK", "diferencial")),
+                                         auto_extrinseca=_auto_ext_v2,
+                                         vigilar_extrinseca=bool(globals().get("TELEOP_FR5_VIGILAR_EXTRINSECA", True)),
+                                         vertical_auto=bool(globals().get("TELEOP_FR5_VERTICAL_AUTO", True))),
+                        al_calibrar_extrinseca=_guardar_ext_v2,
                         par_fusion=_ParFusionV2(vis_min=POSE_VISIBILIDAD_MIN, z_min=PROF_Z_MIN, z_max=PROF_Z_MAX,
                                                 prof_radio_px=PROF_RADIO_PX, prof_percentil=PROF_PERCENTIL,
                                                 prof_min_pix=PROF_MIN_PIXELES,
                                                 escorzo_ang=tuple(globals().get("TELEOP_FR5_ESCORZO_DEG", (20.0, 40.0))),
                                                 hold_s=float(globals().get("TELEOP_FR5_HOLD_S", 0.8)),
                                                 hombro_hacia_torso=HOMBRO_PROF_HACIA_TORSO,
-                                                arriba_ref=ARRIBA_REF),
+                                                arriba_ref=str(globals().get("TELEOP_FR5_ARRIBA_REF", ARRIBA_REF)),
+                                                triangular=bool(globals().get("TELEOP_FR5_TRIANGULAR", True))),
                         cfg_retarget=_CfgRetV2(escala=globals().get("TELEOP_FR5_ESCALA"),
                                                fraccion_alcance=float(globals().get("TELEOP_FR5_FRACCION", 0.85)),
                                                z_min=_z_min_v2, prono_escala_z=PRONO_Z_ESCALA,
-                                               roll_rango_deg=float(globals().get("TELEOP_FR5_ROLL_RANGO_DEG", 120.0))),
+                                               roll_rango_deg=float(globals().get("TELEOP_FR5_ROLL_RANGO_DEG", 120.0)),
+                                               alcance_max=float(globals().get("TELEOP_FR5_ALCANCE_MAX", 0.88))),
                         lim_anatomicos=_LimAnatV2(hombro_az_min=HOMBRO_AZ_MIN, hombro_az_max=HOMBRO_AZ_MAX,
                                                   hombro_ext_elev=HOMBRO_EXT_ELEV,
                                                   hombro_az_libre_elev=HOMBRO_AZ_LIBRE_ELEV,
@@ -950,6 +974,12 @@ def main():
                           f"{teleop_v2.retarget.alcance_robot:.2f} m, suelo {_ent_v2.z_suelo}")
                 t_ult_print_v2 = 0.0
                 t_prev_v2 = None
+                # 28-oct (fluidez): la v2 en un hilo aparte, solapada con la cámara y MediaPipe
+                teleop_v2_par = None
+                if teleop_v2 is not None and globals().get("TELEOP_FR5_EN_PARALELO", True):
+                    from skill_shield.teleop_fr5.teleop_brazo import TeleopEnParalelo
+                    teleop_v2_par = TeleopEnParalelo(teleop_v2)
+                registro_v2 = None    # 28-oct: [R] registro quieto (skill_shield/teleop_fr5/diagnostico.py)
 
                 angulos_brazo    = None   # últimos ángulos válidos del brazo humano
                 t_ult_ang_valido = 0.0    # perf_counter() del último frame con _ang != None
@@ -1155,7 +1185,10 @@ def main():
                             landmark_drawing_spec=mp_styles.get_default_pose_landmarks_style())
 
                     # — Ángulos del brazo humano (paso 3: solo calcular y mostrar) —
-                    if resultado_pose.pose_world_landmarks and resultado_pose.pose_landmarks:
+                    # 28-oct: con TELEOP_FR5_V2 el brazo lo mueve teleop_fr5 y este pipeline antiguo
+                    # (FusorBrazo, ángulos, PASOS 4-7) solo duplicaba trabajo en cada fotograma.
+                    if resultado_pose.pose_world_landmarks and resultado_pose.pose_landmarks \
+                            and (teleop_v2 is None or not globals().get("TELEOP_FR5_SIN_PIPELINE_ANTIGUO", True)):
                         _calib_antes = est_brazo.calibrando   # ¿estamos aún en la T-pose de calibración?
                         _ang_mp = calcular_angulos_brazo_humano(
                             resultado_pose.pose_world_landmarks, BRAZO_HUMANO)
@@ -1872,20 +1905,42 @@ def main():
                             _hw = resultado.multi_hand_world_landmarks[0]
                             _mano_v2 = (_lm_hand(_hw, LM_CORAZON_MCP) - _lm_hand(_hw, LM_MUNECA),
                                         _lm_hand(_hw, LM_MENIQUE_MCP) - _lm_hand(_hw, LM_INDICE_MCP))
-                        _q_v2, _info_v2 = teleop_v2.actualizar(
-                            {"A": _obs_a, "B": _obs_b}, _t_v2, mano=_mano_v2,
-                            q_actual=[float(datos.ctrl[_i]) for _i in range(6)], dt=_dt_v2)
+                        _q_act_v2 = [float(datos.ctrl[_i]) for _i in range(6)]
+                        if teleop_v2_par is not None:
+                            # resultado del fotograma ANTERIOR (el hilo lo calculó mientras esta
+                            # vuelta esperaba a la cámara y a MediaPipe) y se lanza el de este
+                            _q_v2, _info_v2 = teleop_v2_par.recoger()
+                            _alimentar_registro = registro_v2 is not None and registro_v2.activo
+                            if _alimentar_registro:                 # (el hilo está parado aquí)
+                                _fin_reg = registro_v2.alimentar(_t_v2, teleop_v2)
+                            teleop_v2_par.lanzar({"A": _obs_a, "B": _obs_b}, _t_v2, mano=_mano_v2,
+                                                 q_actual=_q_act_v2, dt=_dt_v2)
+                        else:
+                            _q_v2, _info_v2 = teleop_v2.actualizar(
+                                {"A": _obs_a, "B": _obs_b}, _t_v2, mano=_mano_v2,
+                                q_actual=_q_act_v2, dt=_dt_v2)
+                            _alimentar_registro = registro_v2 is not None and registro_v2.activo
+                            if _alimentar_registro:
+                                _fin_reg = registro_v2.alimentar(_t_v2, teleop_v2)
                         _est_v2 = _info_v2.get("estado", "?")
+                        if _alimentar_registro:
+                            if _fin_reg:
+                                print(f"🩺 Registro de diagnóstico terminado → {registro_v2.ruta}")
+                            else:
+                                cv2.putText(frame_bgr, f"REGISTRO QUIETO {registro_v2.restante(_t_v2):4.1f} s - no te muevas",
+                                            (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
                         if _q_v2 is not None and _est_v2 in ("exacta", "aprox", "transicion", "bloqueado"):
                             _enviar_brazo((0, 1, 2, 3, 4, 5), [float(_v) for _v in _q_v2])
                             brazo_imit_activo = True
                         if _est_v2 == "calibrando":
-                            _txt_v2 = (f"CALIBRANDO HUESOS {_info_v2.get('progreso', 0)}/{CALIB_HUESOS_FRAMES}"
-                                       " - manten T-pose (brazo estirado)")
+                            _txt_v2 = _info_v2.get("texto") or (
+                                f"CALIBRANDO HUESOS {_info_v2.get('progreso', 0)}/{CALIB_HUESOS_FRAMES}"
+                                " - manten T-pose (brazo estirado)")
                             _col_v2 = (0, 200, 255)
                         else:
-                            _txt_v2 = (f"BRAZO v2: {_est_v2.upper()}  rama={_info_v2.get('rama')}  "
-                                       f"err={100 * (_info_v2.get('error') or 0):.1f}cm")
+                            _txt_v2 = (f"BRAZO v2: {_est_v2.upper()}  "
+                                       f"err={100 * (_info_v2.get('error') or 0):.1f}cm"
+                                       + (f"  {_info_v2['aviso']}" if _info_v2.get("aviso") else ""))
                             _col_v2 = {"exacta": (0, 255, 0), "aprox": (0, 200, 255),
                                        "transicion": (255, 200, 0)}.get(_est_v2, (0, 0, 255))
                         cv2.putText(frame_bgr, _txt_v2, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, _col_v2, 1)
@@ -1927,6 +1982,9 @@ def main():
                             if teleop_v2 is not None:
                                 # v2: calibra los huesos con su propia fusión y arranca la IK desde
                                 # donde esté el brazo (no se mueve a la T-pose ni a POSE_BRAZO_ACTIVAR)
+                                if teleop_v2_par is not None:
+                                    teleop_v2_par.recoger()              # que el hilo no esté a medias
+                                    teleop_v2_par.ultimo = (None, {"estado": "calibrando"})
                                 teleop_v2.iniciar_calibracion()
                                 teleop_v2.ik.q = None
                                 t_prev_v2 = None
@@ -2030,6 +2088,22 @@ def main():
                                   if brazo_congelado else
                                   ("▶️  Brazo descongelado: sigue en modo fino DESDE AQUÍ." if brazo_fino
                                    else "▶️  Brazo descongelado: vuelve a imitarte (suavemente)."))
+
+                    elif key in (ord("r"), ord("R")) and teleop_v2 is not None:
+                        # 28-oct: separar medida de IK — graba la salida de Fusor2Cam estando quieto
+                        if not estado["camara_activa"]:
+                            print("🩺 [R] Activa antes la cámara con [A] (la fusión v2 solo corre activa).")
+                        elif registro_v2 is not None and registro_v2.activo:
+                            registro_v2.activo = False
+                            print("🩺 [R] Registro de diagnóstico cancelado.")
+                        else:
+                            from skill_shield.teleop_fr5.diagnostico import RegistroQuieto
+                            registro_v2 = RegistroQuieto(float(globals().get("TELEOP_FR5_DIAG_S", 10.0)),
+                                                         etiqueta=str(globals().get("TELEOP_FR5_DIAG_ETIQUETA", "tpose")),
+                                                         longitudes_manual=LONG_BRAZO_MANUAL)
+                            registro_v2.iniciar(time.perf_counter())
+                            print(f"🩺 [R] Registro de diagnóstico: {registro_v2.duracion:.0f} s QUIETO "
+                                  f"(T-pose, brazo estirado). [R] otra vez para cancelar.")
 
                     elif key == ord("g") and estado["camara_activa"]:
                         grabando = not grabando

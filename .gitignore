@@ -6,10 +6,16 @@ __pycache__/
 # C extensions
 *.so
 
+*/__pycache__/
+*/__init__.pyc
+*/__init__.py
+__init__.py
 MUJOCO_LOG.TXT
 MANUS_Core_3.2.1_SDK_Linux/
 venv_nivel6/
 taladro/textures_detailed.zip
+camaras_extrinsecas.json*
+*.bak*
 
 # Distribution / packaging
 .Python

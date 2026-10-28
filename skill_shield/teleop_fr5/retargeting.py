@@ -167,6 +167,8 @@ class ConfigRetargeting:
     z_min: float = None                  # m: altura mínima de la muñeca del robot (None = sin límite)
     z_min_suave: float = 0.15            # m: tramo de compresión suave por encima de z_min
     z_mano_scale: float = 1.0            # escala extra de la altura (1 = isótropo)
+    largo_mano_m: float = 0.24           # muñeca de la OrcaHand → punta de los dedos (+ radio): con la
+                                         # mano hacia abajo, z_min se aplica a la PUNTA, no a la muñeca
     comprimir_abajo: bool = True         # media inferior comprimida (el hombro del robot está bajo)
     prono_escala_z: float = 1.6          # MediaPipe Hands aplasta la profundidad de la mano
     roll_tau_s: float = 0.12             # s: suavizado exponencial de la pronosupinación medida
@@ -269,16 +271,20 @@ class Retargeting:
         if r > r_max:
             v_r *= r_max / r
         p_w = self.hombro_robot + v_r
-        # altura mínima (suelo / mesa): compresión suave
+        d_b_r = self.a_robot(d_b)
+        d_a_r = self.a_robot(d_a)
+        # altura mínima (suelo / mesa / bastidor): compresión suave. Se aplica al punto más bajo
+        # de la mano: con la mano apuntando hacia abajo, los dedos quedan largo_mano_m por debajo
+        # de la muñeca (con la escala ~1,65 el brazo colgando del robot no cabe hasta el suelo).
         if cfg.z_min is not None:
-            z_rel = p_w[2] - cfg.z_min
+            f_ = _u(d_a_r)
+            bajada = max(0.0, -float(f_[2])) * cfg.largo_mano_m if f_ is not None else 0.0
+            z_rel = p_w[2] - (cfg.z_min + bajada)
             if z_rel < cfg.z_min_suave:
                 s = cfg.z_min_suave
                 # de z_rel = s hacia abajo: z' = s · exp((z_rel − s)/s) ∈ (0, s]
-                p_w[2] = cfg.z_min + s * math.exp(min((z_rel - s) / s, 0.0))
+                p_w[2] = cfg.z_min + bajada + s * math.exp(min((z_rel - s) / s, 0.0))
         # codo sugerido: dirección del brazo humano con la longitud del brazo del robot
-        d_b_r = self.a_robot(d_b)
-        d_a_r = self.a_robot(d_a)
         p_e = self.hombro_robot + self.L1_robot * d_b_r
         # orientación: adelante = antebrazo; giro = pronosupinación
         f = _u(d_a_r)

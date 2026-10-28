@@ -113,6 +113,7 @@ class CadenaFR5:
         assert len(eslabones) == 6
         self.eslabones = [(np.asarray(T, dtype=float), np.asarray(a, dtype=float) / np.linalg.norm(a))
                           for T, a in eslabones]
+        self._ejes = np.array([a for _, a in self.eslabones])          # (6, 3) ejes en su marco
         self.T_base = np.asarray(T_base, dtype=float)
         self.T_tool = np.asarray(T_tool, dtype=float)
         self.limites = np.asarray(limites, dtype=float).reshape(6, 2)
@@ -220,12 +221,20 @@ class CadenaFR5:
 
     # ── FK ───────────────────────────────────────────────────────────────────
     def fk_marcos(self, q):
-        """Lista de 7 matrices 4x4 en el MUNDO: marco de cada joint YA GIRADO (6) + herramienta."""
-        q = np.asarray(q, dtype=float)
-        T = self.T_base.copy()
+        """Lista de 7 matrices 4x4 en el MUNDO: marco de cada joint YA GIRADO (6) + herramienta.
+        (28-oct: Rodrigues en forma cerrada sin matrices intermedias; mismo resultado, ~3× más
+        rápido: la IK diferencial la llama varias veces por fotograma.)"""
+        T = self.T_base
         marcos = []
+        G = np.eye(4)
         for (Tf, eje), qi in zip(self.eslabones, q):
-            T = T @ Tf @ T_de(rot_eje(eje, qi))
+            x, y, z = eje
+            c, s_ = math.cos(qi), math.sin(qi)
+            C = 1.0 - c
+            G[0, 0], G[0, 1], G[0, 2] = c + x * x * C, x * y * C - z * s_, x * z * C + y * s_
+            G[1, 0], G[1, 1], G[1, 2] = y * x * C + z * s_, c + y * y * C, y * z * C - x * s_
+            G[2, 0], G[2, 1], G[2, 2] = z * x * C - y * s_, z * y * C + x * s_, c + z * z * C
+            T = T @ Tf @ G
             marcos.append(T)
         marcos.append(T @ self.T_tool)
         return marcos
@@ -258,13 +267,9 @@ class CadenaFR5:
         m = self.fk_marcos(q) if marcos is None else marcos
         Tt = m[6]
         p = Tt[:3, :3] @ np.asarray(offset_tool, dtype=float) + Tt[:3, 3]
-        Jl, Ja = np.zeros((3, 6)), np.zeros((3, 6))
-        for i, (_, eje) in enumerate(self.eslabones):
-            w = m[i][:3, :3] @ eje
-            o = m[i][:3, 3]
-            Jl[:, i] = np.cross(w, p - o)
-            Ja[:, i] = w
-        return Jl, Ja
+        W = np.einsum("nij,nj->ni", np.array([mi[:3, :3] for mi in m[:6]]), self._ejes)
+        O = np.array([mi[:3, 3] for mi in m[:6]])
+        return np.cross(W, p - O).T, W.T
 
     def jacobiana_punto_marco(self, q, k, marcos=None):
         """Jacobiana lineal del ORIGEN del marco k (0..6) — p. ej. k=2 → codo, k=4 → muñeca FR5.
@@ -272,9 +277,11 @@ class CadenaFR5:
         m = self.fk_marcos(q) if marcos is None else marcos
         p = m[k][:3, 3]
         J = np.zeros((3, 6))
-        for i in range(min(k, 6)):
-            w = m[i][:3, :3] @ self.eslabones[i][1]
-            J[:, i] = np.cross(w, p - m[i][:3, 3])
+        n = min(k, 6)
+        if n:
+            W = np.einsum("nij,nj->ni", np.array([mi[:3, :3] for mi in m[:n]]), self._ejes[:n])
+            O = np.array([mi[:3, 3] for mi in m[:n]])
+            J[:, :n] = np.cross(W, p - O).T
         return J
 
     # ── parámetros DH equivalentes ────────────────────────────────────────────

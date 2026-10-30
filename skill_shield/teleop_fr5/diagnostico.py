@@ -15,6 +15,8 @@ uno. Este módulo los separa con dos pruebas que no dependen la una de la otra:
        python -m skill_shield.teleop_fr5.diagnostico ik
        python -m skill_shield.teleop_fr5.diagnostico ik --ruido 0,0.5,1,2,4 --saltos 0,3,6 --fps 10
        python -m skill_shield.teleop_fr5.diagnostico ik --detalle          # tabla por pose
+       python -m skill_shield.teleop_fr5.diagnostico ik --brazo izquierdo  # ARCTOS (hombro izquierdo)
+       python -m skill_shield.teleop_fr5.diagnostico ik --brazo ambos      # FR5 y ARCTOS, misma tabla
 
    Con ruido 0 la IK debería ir "exacta" casi siempre: lo que no lo sea es culpa de la IK.
 
@@ -133,9 +135,10 @@ class TrayectoriaLimpia:
         return self.S.copy(), E, W, fase
 
 
-def construir_teleop(L=(0.30, 0.26), usar_config=True, verbose=False):
+def construir_teleop(L=(0.30, 0.26), usar_config=True, verbose=False, brazo="derecho"):
     """TeleopBrazoFR5 con la configuración de la app (config.py, igual que en
-    Skill_Shield_Nivel_6.py) y longitudes fijas. Devuelve (teleop, q_reposo, origen)."""
+    Skill_Shield_Nivel_6.py) y longitudes fijas. Devuelve (teleop, q_reposo, origen).
+    brazo="izquierdo" (29-oct): el ARCTOS del hombro izquierdo (brazo_arctos.py)."""
     from skill_shield.teleop_fr5.cinematica import cargar_cadena
     from skill_shield.teleop_fr5.ik_teleop import Entorno, ParametrosIK, entorno_soporte_hombros
     from skill_shield.teleop_fr5.retargeting import ConfigRetargeting, LimitesAnatomicos
@@ -152,6 +155,12 @@ def construir_teleop(L=(0.30, 0.26), usar_config=True, verbose=False):
             C = None
     g = (lambda n, d=None: getattr(C, n, d)) if C is not None else (lambda n, d=None: d)
     ruta = g("RUTA_XML") or os.path.join(RAIZ_REPO, "fairino_description", "mjcf", "fairino_mjcf.xml")
+    if brazo == "izquierdo":
+        from skill_shield.teleop_fr5.brazo_arctos import construir_teleop_arctos
+        teleop = construir_teleop_arctos(ruta, {}, cfg=C, z_suelo=g("SOPORTE_SUELO_Z", -0.975) or -0.975,
+                                         longitudes_manual=tuple(L), verbose=verbose)
+        q0 = np.array(g("POSICION_STANDBY_ARCTOS", [0.0, 0.0, 0.21, 0.0, 0.0, 0.0])[:6], dtype=float)
+        return teleop, q0, ("config.py" if C is not None else "valores por defecto")
     cadena = cargar_cadena(ruta, verbose=verbose)
     inclinada = not np.allclose(cadena.T_base[:3, :3], np.eye(3))
     soporte = g("SOPORTE_HOMBROS", inclinada)
@@ -221,7 +230,6 @@ def diagnosticar_ik(ruido_cm=0.0, saltos_cm=0.0, p_salto=0.15, fps=10.0, semilla
     lado = 1.0 if teleop.cfg.brazo == "derecho" else -1.0
     tray = trayectoria or TrayectoriaLimpia(L=L, lado=lado)
     ref = Retargeting(teleop.cadena, teleop.retarget.cfg, Anatomia(teleop.retarget.anatomia.lim))
-    from skill_shield.teleop_fr5.cinematica import OFFSET_MUNECA_ORCA
     rng = np.random.default_rng(semilla)
     sig = ruido_cm / 100.0
     off = {a: _n(rng.normal(size=3)) * (saltos_cm / 200.0) for a in ARTS}   # ±mitad del salto
@@ -253,7 +261,7 @@ def diagnosticar_ik(ruido_cm=0.0, saltos_cm=0.0, p_salto=0.15, fps=10.0, semilla
                     inicio_tr=(info.get("estado") == "transicion" and info.get("paso") == 0))
         if q is not None and teleop.obj_prev is not None:
             fk = teleop.cadena.fk(q)
-            pw = fk["T_tool"][:3, :3] @ OFFSET_MUNECA_ORCA + fk["T_tool"][:3, 3]
+            pw = fk["T_tool"][:3, :3] @ teleop.cadena.off_muneca + fk["T_tool"][:3, 3]
             ad = fk["adelante"]
             fila.update(
                 err_obj=float(np.linalg.norm(pw - teleop.obj_prev["p_muneca"])),
@@ -331,16 +339,21 @@ def imprimir_ik(r, detalle=False):
 
 
 def barrido_ruido(ruidos=(0.0, 0.5, 1.0, 2.0, 4.0), saltos=(0.0,), fps=10.0, semilla=0, detalle=False,
-                  usar_config=True):
-    """La misma trayectoria con varios niveles de ruido. Imprime una tabla y devuelve la lista."""
+                  usar_config=True, brazo="derecho"):
+    """La misma trayectoria con varios niveles de ruido. Imprime una tabla y devuelve la lista.
+    brazo: "derecho" (FR5), "izquierdo" (ARCTOS) o "ambos" (una tabla por brazo)."""
+    if brazo == "ambos":
+        return {b: barrido_ruido(ruidos, saltos, fps, semilla, detalle, usar_config, b)
+                for b in ("derecho", "izquierdo")}
     filas = []
     for s in saltos:
         for r in ruidos:
-            teleop, q0, _ = construir_teleop(usar_config=usar_config)
+            teleop, q0, _ = construir_teleop(usar_config=usar_config, brazo=brazo)
             res, _ = diagnosticar_ik(r, s, fps=fps, semilla=semilla, teleop=teleop, q0=q0,
                                      verbose=detalle or (r == 0 and s == 0), detalle=detalle)
             filas.append(res)
-    print("\n── Barrido de ruido (misma trayectoria; σ por eje en la salida de la fusión)")
+    robot = "ARCTOS (brazo izquierdo)" if brazo == "izquierdo" else "FR5 (brazo derecho)"
+    print(f"\n── {robot}: barrido de ruido (misma trayectoria; σ por eje en la salida de la fusión)")
     print("  σ cm  salto cm │ exacta  aprox  trans  bloq │ trans.  s sin seguir │ err verdad med/p95 cm │ ori p95")
     for r in filas:
         p = r["pct"]
@@ -648,12 +661,14 @@ def main(argv=None):
     pi.add_argument("--semilla", type=int, default=0)
     pi.add_argument("--detalle", action="store_true", help="tabla por pose")
     pi.add_argument("--sin-config", action="store_true", help="no leer config.py")
+    pi.add_argument("--brazo", default="derecho", choices=("derecho", "izquierdo", "ambos"),
+                    help="derecho = FR5 · izquierdo = ARCTOS · ambos")
     pf = sub.add_parser("informe", help="informe de un registro quieto guardado (.npz)")
     pf.add_argument("ruta", nargs="+")
     a = ap.parse_args(argv)
     if a.cmd == "ik":
         barrido_ruido(_lista(a.ruido), _lista(a.saltos), fps=a.fps, semilla=a.semilla, detalle=a.detalle,
-                      usar_config=not a.sin_config)
+                      usar_config=not a.sin_config, brazo=a.brazo)
     elif a.cmd == "informe":
         for r in a.ruta:
             informe_quieto(cargar(r), ruta=r)

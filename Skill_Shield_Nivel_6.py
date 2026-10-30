@@ -25,6 +25,11 @@ Controles de teclado:
        ruido de hombro/codo/muñeca, huesos, ángulos y A contra B (diagnosticos/*.npz)
   [Q]  Salir
 
+BRAZO IZQUIERDO (29-oct, BRAZO_IZQ_ACTIVO en config.py): el ARCTOS del hombro izquierdo del
+soporte, con la OrcaHand izquierda, imita tu brazo y tu mano IZQUIERDOS con la misma
+teleoperación que el FR5 (skill_shield/teleop_fr5/bimanual.py). [A] calibra los dos brazos a la
+vez (T-pose con LOS DOS brazos estirados) y [S] los lleva a los dos al reposo.
+
 Dependencias:
   pip install mujoco depthai mediapipe opencv-python numpy torch
 
@@ -275,7 +280,7 @@ def main():
     # ─────────────────────────────────────────────────────────────────────────
 
     print(f"✅ Modelo MuJoCo cargado: {modelo.nu} actuadores, {modelo.nsensor} sensores.")
-    if modelo.nu != OFFSET_MANO + N_ACT:
+    if modelo.nu not in (OFFSET_MANO + N_ACT, 2 * (OFFSET_MANO + N_ACT)):   # FR5+mano (+ ARCTOS+mano izq.)
         print(f"⚠  ADVERTENCIA: El modelo tiene {modelo.nu} actuadores "
               f"pero el código espera {OFFSET_MANO + N_ACT} "
               f"({OFFSET_MANO} de brazo + {N_ACT} de mano). Revisa LIMITES_CTRL.")
@@ -320,6 +325,12 @@ def main():
         datos.ctrl[i] = float(v)
     for i, v in enumerate(POSICION_STANDBY):
         ctrl_mano[i] = float(v)
+    # ── BRAZO IZQUIERDO (29-oct): ARCTOS + OrcaHand izquierda a su reposo ──
+    from skill_shield.teleop_fr5.bimanual import (
+        BrazoIzquierdo, compensar_gravedad_mano_izq, reposo_inicial)
+    _hay_brazo_izq = reposo_inicial(modelo, datos, globals())
+    if _hay_brazo_izq and HAND_GRAVCOMP:
+        print(f"⚖️  Gravedad compensada en {compensar_gravedad_mano_izq(modelo)} cuerpos de la mano IZQUIERDA.")
     mujoco.mj_step(modelo, datos)
 
     # — Suavizadores —
@@ -981,6 +992,15 @@ def main():
                     teleop_v2_par = TeleopEnParalelo(teleop_v2)
                 registro_v2 = None    # 28-oct: [R] registro quieto (skill_shield/teleop_fr5/diagnostico.py)
 
+                # ── BRAZO IZQUIERDO (29-oct): ARCTOS + OrcaHand izquierda con tu brazo/mano izquierdos ──
+                brazo_izq = None
+                if teleop_v2 is not None and _hay_brazo_izq and globals().get("BRAZO_IZQ_ACTIVO", True):
+                    try:
+                        brazo_izq = BrazoIzquierdo(modelo, datos, teleop_v2, globals(), guante)
+                    except Exception as _e_izq:
+                        print(f"⚠️  BRAZO IZQUIERDO desactivado: {_e_izq}")
+                        brazo_izq = None
+
                 angulos_brazo    = None   # últimos ángulos válidos del brazo humano
                 t_ult_ang_valido = 0.0    # perf_counter() del último frame con _ang != None
                 t_ult_print_ang  = 0.0
@@ -1070,10 +1090,13 @@ def main():
                         gen_brazo.paso(m_, d_, dt_)
                     if guante is not None:
                         guante.escribir_ctrl(d_, dt_)
+                    if brazo_izq is not None:            # BRAZO IZQUIERDO: ARCTOS + dedos del MANUS izq.
+                        brazo_izq.antes_de_paso(m_, d_, dt_)
 
                 fisica  = HiloFisica(modelo, datos, visor,
                                      antes_de_paso=_antes_de_paso
-                                     if (gen_brazo is not None or guante is not None) else None) \
+                                     if (gen_brazo is not None or guante is not None
+                                         or brazo_izq is not None) else None) \
                           if FISICA_EN_HILO else None
                 _soltar = fisica.soltar if fisica is not None else nullcontext
                 if fisica is not None:
@@ -1166,6 +1189,11 @@ def main():
                             fut_mano = pool_mano.submit(detectar_mano_en_recorte,
                                                         detector_mano_recorte, frame_limpio, caja_par)
 
+
+                    # — BRAZO IZQUIERDO: Hands de tu mano izquierda en su propio hilo —
+                    if brazo_izq is not None and estado["camara_activa"]:
+                        brazo_izq.lanzar_mano(pose_lm_prev,
+                                              frame_limpio if frame_limpio is not None else frame_bgr.copy())
 
                     # — DOS CÁMARAS: la Pose de B corre en su hilo mientras A hace la suya —
                     fut_cam_b = cam_b.lanzar(_t_color) if cam_b is not None else None
@@ -1953,6 +1981,15 @@ def main():
                                   f"err={100 * (_info_v2.get('error') or 0):4.1f}cm  q=[{_qtxt}]  "
                                   f"{_info_v2.get('motivo', '')}  | {_info_v2.get('fuentes', '')}")
 
+                    # ══ BRAZO IZQUIERDO (29-oct): las mismas observaciones → ARCTOS + mano izquierda ══
+                    if brazo_izq is not None:
+                        if teleop_v2 is not None and estado["camara_activa"]:
+                            brazo_izq.fotograma(datos, _t_v2, _obs_a, _obs_b, resultado_pose, frame_bgr, True,
+                                                q_der=_q_act_v2)
+                        else:
+                            brazo_izq.fotograma(datos, time.perf_counter(), None, None, resultado_pose,
+                                                frame_bgr, False)
+
                     # — Teclado Avanzado (usamos waitKeyEx para captar flechas) —
                     key = cv2.waitKeyEx(1)
                     if perfil is not None:
@@ -1988,6 +2025,8 @@ def main():
                                 teleop_v2.iniciar_calibracion()
                                 teleop_v2.ik.q = None
                                 t_prev_v2 = None
+                                if brazo_izq is not None:        # BRAZO IZQUIERDO: también calibra
+                                    brazo_izq.activar(datos)
                                 print("🦾 [A] TELEOP v2: calibrando huesos (T-pose, brazo estirado) "
                                       f"~{CALIB_HUESOS_FRAMES} fotogramas; el FR5 sale de su postura actual.")
                             _pose_A = globals().get("POSE_BRAZO_ACTIVAR") if teleop_v2 is None else None
@@ -2043,6 +2082,8 @@ def main():
                         _enviar_brazo(range(len(POSICION_STANDBY_BRAZO)), POSICION_STANDBY_BRAZO)
                         for i, v in enumerate(POSICION_STANDBY):
                             ctrl_mano[i] = float(v)
+                        if brazo_izq is not None:            # BRAZO IZQUIERDO: también al reposo
+                            brazo_izq.standby(datos)
                         print("⏸ STANDBY — posición de reposo restaurada (brazo + mano).")
 
                     elif key == ord("h"):
@@ -2335,6 +2376,8 @@ def main():
                                     gen_brazo.paso(modelo, datos, modelo.opt.timestep)
                                 if guante is not None:           # dedos del guante MANUS
                                     guante.escribir_ctrl(datos, modelo.opt.timestep)
+                                if brazo_izq is not None:        # BRAZO IZQUIERDO
+                                    brazo_izq.antes_de_paso(modelo, datos, modelo.opt.timestep)
                                 mujoco.mj_step(modelo, datos)
                             visor.sync()
                         # ── Logo IDI — HUD inferior centrado del visor MuJoCo ──
@@ -2392,6 +2435,9 @@ def main():
                     fisica = None
                 if gen_brazo is not None:
                     gen_brazo.desactivar()
+                if brazo_izq is not None:            # BRAZO IZQUIERDO: hilos de su IK y de Hands
+                    brazo_izq.cerrar()
+                    brazo_izq = None
 
     # — Limpieza —
     cv2.destroyAllWindows()

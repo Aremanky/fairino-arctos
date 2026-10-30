@@ -8,6 +8,13 @@ GENERA decoracion/soporte_hombros.xml (lo incluye fairino_mjcf.xml) a partir de 
 MEDIDAS de abajo, y AJUSTA en fairino_mjcf.xml la pose de <body name="base_link">
 para que el FR5 quede atornillado en la placa del HOMBRO DERECHO.
 
+29-oct (FR5 + ARCTOS): con ARCTOS_EN_IZQUIERDO = True la placa del HOMBRO IZQUIERDO (+X)
+lleva el ARCTOS (tornillos y disco adaptador, como la derecha) y el script ajusta también
+<body name="arctos_base_link"> en fairino_mjcf.xml: base apoyada en la placa (eje de su
+joint1 = normal de la placa, hacia fuera y abajo) y su +Y hacia ATRÁS (+Y del mundo), de
+modo que con todos los joints a 0 el brazo sale a 45° hacia fuera-abajo (como el FR5 en
+reposo) y el antebrazo apunta al FRENTE (-Y). ARCTOS_GIRO_DEG gira la base sobre la placa.
+
 Cómo está colocado (la idea clave para no romper [3] [4] [5]):
   · El HOMBRO del FR5 (eje de joint2) se queda EXACTAMENTE donde estaba con la peana:
     (0, 0, 0.155). La base gira 45° hacia fuera y hacia abajo alrededor de ese punto,
@@ -66,6 +73,11 @@ MEDIDAS = dict(
 # El FR5: su hombro (ancla de joint2) está a 0.155 m de la base, sobre el eje de joint1.
 HOMBRO_MUNDO = (0.0, 0.0, 0.155)   # NO cambiar: es donde estaba con la peana (ver arriba)
 BASE_A_HOMBRO = 0.155
+
+# ARCTOS en el hombro IZQUIERDO (+X). False = placa izquierda vacía (solo taladros), como antes.
+ARCTOS_EN_IZQUIERDO = True
+ARCTOS_DISCO = (0.085, 0.006)      # adaptador entre la placa y la base del ARCTOS (radio, espesor)
+ARCTOS_GIRO_DEG = 0.0              # giro de la base del ARCTOS sobre su placa (0 = su +Y hacia atrás)
 
 # Colores: "elecnor" = columna y alas azul corporativo, chapas grafito, acentos naranja
 #          "real"    = acero negro, bastidor galvanizado y ruedas rojas (como en los vídeos)
@@ -131,8 +143,22 @@ def geometria(M=MEDIDAS):
     x = (0.0, 1.0, 0.0)
     y = (n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0])
     R = [[x[0], y[0], n[0]], [x[1], y[1], n[1]], [x[2], y[2], n[2]]]
+    # ── ARCTOS en la placa IZQUIERDA (espejo de la derecha respecto al eje de la columna) ──
+    # Base del ARCTOS: z = normal de la placa izquierda (hacia fuera y abajo) = eje de su joint1;
+    # +Y hacia atrás (+Y del mundo) girado ARCTOS_GIRO_DEG sobre la placa; x = y × z.
+    n_i = (s, 0.0, -c)
+    cara_i = (2 * x_col - cara[0], cara[1], cara[2])
+    e_a = ARCTOS_DISCO[1] if ARCTOS_DISCO else 0.0
+    base_i = _add(cara_i, n_i, e_a)
+    g_ = math.radians(ARCTOS_GIRO_DEG)
+    y0, x0_ = (0.0, 1.0, 0.0), (-c, 0.0, -s)               # x0 = y0 × n_i
+    y_i = tuple(math.cos(g_) * y0[k] - math.sin(g_) * x0_[k] for k in range(3))
+    x_i = (y_i[1] * n_i[2] - y_i[2] * n_i[1], y_i[2] * n_i[0] - y_i[0] * n_i[2],
+           y_i[0] * n_i[1] - y_i[1] * n_i[0])
+    R_i = [[x_i[0], y_i[0], n_i[0]], [x_i[1], y_i[1], n_i[1]], [x_i[2], y_i[2], n_i[2]]]
     return dict(th=th, n=n, u_in=u_in, base=base, cara=cara, cara_in=cara_in, I=I, O=O,
-                x_col=x_col, z_o=z_o, z_top=z_top, z_suelo=z_suelo, base_quat=_mat2quat(R))
+                x_col=x_col, z_o=z_o, z_top=z_top, z_suelo=z_suelo, base_quat=_mat2quat(R),
+                n_izq=n_i, cara_izq=cara_i, base_izq=base_i, base_izq_quat=_mat2quat(R_i))
 
 
 PALETAS = {
@@ -257,7 +283,8 @@ def generar(M=MEDIDAS):
         a, b = _add(cara, n, 0.0006), _add(cara, n, -0.0005)
         cil(f"placa_{lado}_agujero", b, a, M["agujero_r"], "hueco")
         u = (math.cos(th), 0.0, s_ * math.sin(th))          # eje de la placa en el plano XZ
-        brazo_aqui = s_ < 0
+        brazo_aqui = s_ < 0 or ARCTOS_EN_IZQUIERDO           # derecha: FR5 · izquierda: ARCTOS
+        disco = M["disco"] if s_ < 0 else ARCTOS_DISCO
         for k, (du, dy) in enumerate(((1, 1), (1, -1), (-1, 1), (-1, -1))):
             off = tuple(du * (L / 2 - m_) * u[i] for i in range(3))
             pa = (a[0] + off[0], dy * (L / 2 - m_), a[2] + off[2])
@@ -266,8 +293,8 @@ def generar(M=MEDIDAS):
                 cil(f"placa_{lado}_tornillo{k}", pb, _add(pa, n, 0.008), 0.009, "herraje")
             else:
                 cil(f"placa_{lado}_taladro{k}", pb, pa, M["tal_r"], "hueco")
-        if brazo_aqui and M["disco"]:
-            r_d, e_d = M["disco"]
+        if brazo_aqui and disco:
+            r_d, e_d = disco
             cil(f"placa_{lado}_disco", cara, _add(cara, n, e_d), r_d, "acento")
 
     # ── logos ──
@@ -285,7 +312,8 @@ def generar(M=MEDIDAS):
     lin = [
         "<!--",
         f"  Soporte del FR5: columna con cabezal en T y dos hombros a {M['hombro_grados']:.0f}°,",
-        "  sobre bastidor con ruedas. El FR5 va en la placa del hombro DERECHO (-X).",
+        "  sobre bastidor con ruedas. El FR5 va en la placa del hombro DERECHO (-X)"
+        + (" y el ARCTOS en la del IZQUIERDO (+X)." if ARCTOS_EN_IZQUIERDO else "."),
         "  GENERADO por decoracion/crear_soporte_hombros.py — para cambiar medidas o colores,",
         "  edita el script y vuelve a ejecutarlo (rehace también la base del brazo).",
         "  Solo visual: geoms estáticos sin colisión ni masa (como la peana de antes).",
@@ -324,8 +352,30 @@ def colocar_base(g):
           f"inclinada {MEDIDAS['hombro_grados']:.0f}° (quat {_fmt(*g['base_quat'])})")
 
 
+RE_BASE_ARCTOS = re.compile(r'<body name="arctos_base_link" pos="[^"]*"(?: quat="[^"]*")?>')
+
+
+def colocar_base_arctos(g):
+    """Pose de <body name="arctos_base_link"> en fairino_mjcf.xml (placa izquierda)."""
+    with open(RUTA_MJCF, encoding="utf-8") as fh:
+        xml = fh.read()
+    f8 = lambda *v: " ".join(f"{(0.0 if abs(x) < 5e-12 else x):.9g}" for x in v)
+    nueva = f'<body name="arctos_base_link" pos="{f8(*g["base_izq"])}" quat="{f8(*g["base_izq_quat"])}">'
+    xml2, n = RE_BASE_ARCTOS.subn(nueva, xml, count=1)
+    if n != 1:
+        print('⚠ No encuentro <body name="arctos_base_link" ...> en fairino_mjcf.xml (¿modelo sin ARCTOS?)')
+        return
+    if xml2 != xml:
+        with open(RUTA_MJCF, "w", encoding="utf-8") as fh:
+            fh.write(xml2)
+    print(f"✓ fairino_mjcf.xml: base del ARCTOS en ({_fmt(*g['base_izq'])}), "
+          f"inclinada {MEDIDAS['hombro_grados']:.0f}° hacia fuera (quat {_fmt(*g['base_izq_quat'])})")
+
+
 if __name__ == "__main__":
     geo = generar()
     colocar_base(geo)
+    if ARCTOS_EN_IZQUIERDO:
+        colocar_base_arctos(geo)
     print(f"  Suelo en z = {geo['z_suelo']:.4f} m (config.py → SOPORTE_SUELO_Z y marcas [H]/[Z] "
           f"si ha cambiado) · hombro del FR5 a {HOMBRO_MUNDO[2] - geo['z_suelo']:.3f} m del suelo")

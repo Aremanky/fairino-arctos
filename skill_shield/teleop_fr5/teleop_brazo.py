@@ -82,9 +82,12 @@ class TeleopBrazoFR5:
                       f"hombro q1 [{lo[0]:.0f}, {hi[0]:.0f}]° q2 [{lo[1]:.0f}, {hi[1]:.0f}]° + cono")
             else:
                 lo, hi = np.degrees(self.ik.lo_h), np.degrees(self.ik.hi_h)
-                print("🧍 IK diferencial (una sola rama, sin transiciones; límites humanos como coste): "
-                      f"codo joint3 {'>' if self.ik.postura.codo_signo > 0 else '<'} 0, "
-                      f"muñeca |q4|≤{par_ik.muneca_q4_deg:.0f}° |q5−90°|≤{par_ik.muneca_q5_deg:.0f}°, "
+                c0 = math.degrees(self.cadena.codo_recto)
+                n5 = math.degrees(self.cadena.muneca_neutra[1])
+                print(f"🧍 IK diferencial {getattr(self.cadena, 'robot', 'FR5')} (una sola rama, sin transiciones; "
+                      "límites humanos como coste): "
+                      f"codo joint3 {'>' if self.ik.postura.codo_signo > 0 else '<'} {c0:.0f}°, "
+                      f"muñeca |q4|≤{par_ik.muneca_q4_deg:.0f}° |q5−{n5:.0f}°|≤{par_ik.muneca_q5_deg:.0f}°, "
                       f"banda hombro q1 [{lo[0]:.0f}, {hi[0]:.0f}]° q2 [{lo[1]:.0f}, {hi[1]:.0f}]°")
         # extrínseca automática (solo con dos cámaras)
         self.autoext = None

@@ -1190,3 +1190,63 @@ TELEOP_FR5_EN_PARALELO = True
 # La parte de la IK se prueba sin hardware:  python -m skill_shield.teleop_fr5.diagnostico ik
 TELEOP_FR5_DIAG_S        = 10.0
 TELEOP_FR5_DIAG_ETIQUETA = "tpose"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BRAZO IZQUIERDO: ARCTOS + OrcaHand IZQUIERDA en el hombro libre del soporte (29-oct)
+# ═══════════════════════════════════════════════════════════════════════════
+# El ARCTOS va en la placa del hombro IZQUIERDO (+X) del soporte (fairino_mjcf.xml; su pose la
+# escribe fairino_description/mjcf/decoracion/crear_soporte_hombros.py). Se teleopera con tu
+# BRAZO IZQUIERDO con la MISMA teleoperación que el FR5 (skill_shield/teleop_fr5: fusión de las
+# dos OAK-D, límites humanos, IK diferencial con postura humana, colisiones), con su cadena y
+# sus ajustes (brazo_arctos.py). Los dedos de su mano salen del guante MANUS IZQUIERDO (el
+# mismo SDK que el derecho). Necesita TELEOP_FR5_V2 = True y MODO_BRAZO = "imitacion".
+# False = todo como antes (el ARCTOS se queda quieto en su reposo).
+BRAZO_IZQ_ACTIVO = True
+
+# Joints y actuadores del ARCTOS en el MJCF (ctrl[23..28]) y de la mano izquierda (ctrl[29..45]).
+# Los índices se buscan por NOMBRE al arrancar; esto es solo para leerlos.
+ARCTOS_JOINTS      = ["arctos_joint1", "arctos_joint2", "arctos_joint3",
+                      "arctos_joint4", "arctos_joint5", "arctos_joint6"]
+ARCTOS_ACTUADORES  = ["act_arctos_joint1", "act_arctos_joint2", "act_arctos_joint3",
+                      "act_arctos_joint4", "act_arctos_joint5", "act_arctos_joint6"]
+MANO_IZQ_PRIMER_ACTUADOR = "left_wrist_actuator"   # los 17 de la mano izquierda van seguidos
+
+# Reposo del ARCTOS: brazo a lo largo del eje de su base (45° hacia fuera y abajo, como el FR5),
+# antebrazo al FRENTE ~12° hacia abajo, muñeca recta. [S] y al arrancar.
+POSICION_STANDBY_ARCTOS = [0.0, 0.0, 0.21, 0.0, 0.0, 0.0]
+
+# ── Teleoperación (lo que no se pone aquí, como el FR5: ver brazo_arctos.DEFECTO) ──
+TELEOP_IZQ_ESCALA     = None    # None = automática: tu brazo estirado = TELEOP_IZQ_FRACCION del alcance
+TELEOP_IZQ_FRACCION   = 0.85    #   del ARCTOS+OrcaHand (escala ≈ 1,14 con un brazo de 0,56 m)
+TELEOP_IZQ_ALCANCE_MAX = 0.88
+TELEOP_IZQ_Z_MIN      = None    # None = suelo + 0.25
+TELEOP_IZQ_MUNECA_DEG = (110.0, 100.0)   # |joint4| (giro del antebrazo) y |joint5| (flexión) "humanos"
+TELEOP_IZQ_LIMITES    = {}      # límites extra {joint 0..5: (lo, hi)} rad
+TELEOP_IZQ_V_MAX      = 3.0     # rad/s, tope del módulo
+TELEOP_IZQ_SUAVE_VEL  = 2.5     # GeneradorSuave (hilo de física) del ARCTOS, por joint
+TELEOP_IZQ_SUAVE_ACEL = 20.0
+TELEOP_IZQ_EN_PARALELO = True   # fusión + IK del brazo izquierdo en su propio hilo (como el FR5)
+TELEOP_IZQ_DEBUG      = True    # imprime estado/error del ARCTOS cada DEBUG_ANGULOS_CADA_S
+
+# Pronosupinación de tu mano izquierda (el giro de la mano del ARCTOS):
+#   "hands" = MediaPipe Hands sobre un recorte de TU MANO IZQUIERDA, en su propio hilo (como el
+#             FR5); si en un fotograma no la encuentra, usa los puntos de la mano de Pose
+#   "pose"  = solo los puntos de la mano de MediaPipe Pose (sin coste extra, algo más ruidoso)
+#   "fija"  = se mantiene el giro del inicio
+TELEOP_IZQ_PRONO = "hands"
+
+# Flexión de la muñeca de la OrcaHand IZQUIERDA (ctrl[29]): "camara" = como la derecha (tu mano
+# izquierda respecto a como estaba al pulsar [A], con MediaPipe Hands) · "fija" = recta (0).
+# Si se dobla AL REVÉS que la tuya, cambia el signo.
+TELEOP_IZQ_MUNECA_MANO = "camara"
+TELEOP_IZQ_MUNECA_SIGNO = -1.0   # la mano izquierda es el espejo de la derecha
+
+# Dedos de la mano izquierda: "manus" = guante MANUS IZQUIERDO (mismo SDK/dongle que el derecho;
+# calibración propia: python calibrar_manus.py --izquierda → manus_calibracion_izq.json; sin ella
+# se usa la de la derecha) · "quieta" = mano en reposo.
+FUENTE_DEDOS_IZQ = "manus"
+MANUS_CALIBRACION_IZQ = os.path.join(_BASE_DIR, "manus_calibracion_izq.json")
+
+# Cada brazo ve al otro como obstáculo (cápsulas en su postura actual): no se cruzan.
+TELEOP_COLISION_ENTRE_BRAZOS = True

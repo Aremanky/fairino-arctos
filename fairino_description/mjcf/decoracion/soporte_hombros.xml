@@ -1,6 +1,6 @@
 <!--
   Soporte del FR5: columna con cabezal en T y dos hombros a 45°,
-  sobre bastidor con ruedas. El FR5 va en la placa del hombro DERECHO (-X).
+  sobre bastidor con ruedas. El FR5 va en la placa del hombro DERECHO (-X) y el ARCTOS en la del IZQUIERDO (+X).
   GENERADO por decoracion/crear_soporte_hombros.py — para cambiar medidas o colores,
   edita el script y vuelve a ejecutarlo (rehace también la base del brazo).
   Solo visual: geoms estáticos sin colisión ni masa (como la peana de antes).
@@ -81,10 +81,11 @@
     <geom name="sop_ala_izquierda_1" type="mesh" mesh="sop_ala_izquierda_1" material="sop_columna" contype="0" conaffinity="0" group="2"/>
     <geom name="sop_placa_izquierda" type="box" pos="0.40214 0 0.27309" size="0.11 0.11 0.006" quat="0.38268 0 0.92388 0" material="sop_chapa" contype="0" conaffinity="0" group="2"/>
     <geom name="sop_placa_izquierda_agujero" type="cylinder" fromto="0.40602 0 0.2692 0.4068 0 0.26842" size="0.045" material="sop_hueco" contype="0" conaffinity="0" group="2"/>
-    <geom name="sop_placa_izquierda_taladro0" type="cylinder" fromto="0.46825 0.088 0.33142 0.46903 0.088 0.33065" size="0.0045" material="sop_hueco" contype="0" conaffinity="0" group="2"/>
-    <geom name="sop_placa_izquierda_taladro1" type="cylinder" fromto="0.46825 -0.088 0.33142 0.46903 -0.088 0.33065" size="0.0045" material="sop_hueco" contype="0" conaffinity="0" group="2"/>
-    <geom name="sop_placa_izquierda_taladro2" type="cylinder" fromto="0.3438 0.088 0.20697 0.34458 0.088 0.20619" size="0.0045" material="sop_hueco" contype="0" conaffinity="0" group="2"/>
-    <geom name="sop_placa_izquierda_taladro3" type="cylinder" fromto="0.3438 -0.088 0.20697 0.34458 -0.088 0.20619" size="0.0045" material="sop_hueco" contype="0" conaffinity="0" group="2"/>
+    <geom name="sop_placa_izquierda_tornillo0" type="cylinder" fromto="0.46825 0.088 0.33142 0.47468 0.088 0.32499" size="0.009" material="sop_herraje" contype="0" conaffinity="0" group="2"/>
+    <geom name="sop_placa_izquierda_tornillo1" type="cylinder" fromto="0.46825 -0.088 0.33142 0.47468 -0.088 0.32499" size="0.009" material="sop_herraje" contype="0" conaffinity="0" group="2"/>
+    <geom name="sop_placa_izquierda_tornillo2" type="cylinder" fromto="0.3438 0.088 0.20697 0.35023 0.088 0.20054" size="0.009" material="sop_herraje" contype="0" conaffinity="0" group="2"/>
+    <geom name="sop_placa_izquierda_tornillo3" type="cylinder" fromto="0.3438 -0.088 0.20697 0.35023 -0.088 0.20054" size="0.009" material="sop_herraje" contype="0" conaffinity="0" group="2"/>
+    <geom name="sop_placa_izquierda_disco" type="cylinder" fromto="0.40638 0 0.26884 0.41062 0 0.2646" size="0.085" material="sop_acento" contype="0" conaffinity="0" group="2"/>
     <!-- Logos verticales: Elecnor en la cara delantera (-Y), I+D+i en la trasera (+Y) -->
     <geom name="sop_logo_elecnor" type="plane" pos="0.26011 -0.0765 -0.21089" xyaxes="0 0 1 -1 0 0" size="0.144 0.048 0.01" material="logo_elecnor_material" contype="0" conaffinity="0" group="2"/>
     <geom name="sop_logo_idi" type="plane" pos="0.26011 0.0765 -0.21089" xyaxes="0 0 1 1 0 0" size="0.144 0.048 0.01" material="logo_departamento_material" contype="0" conaffinity="0" group="2"/>

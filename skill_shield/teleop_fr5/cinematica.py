@@ -28,6 +28,11 @@ import numpy as np
 OFFSET_MUNECA_ORCA = np.array([0.0, 0.0923, 0.010])     # eje de la articulación right_wrist
 OFFSET_PALMA_ORCA  = np.array([0.0, 0.137, 0.007])      # centro de la palma
 OFFSET_NUDILLOS    = np.array([0.0008, 0.181, 0.004])
+# OrcaHand IZQUIERDA en mano_mount_izq (29-oct): espejo exacto de la derecha respecto al plano
+# dedos–palma, así que solo cambia el signo de Z (índice→meñique = +Z en la izquierda, −Z en la derecha)
+OFFSET_MUNECA_ORCA_IZQ = OFFSET_MUNECA_ORCA * np.array([1.0, 1.0, -1.0])
+OFFSET_PALMA_ORCA_IZQ  = OFFSET_PALMA_ORCA * np.array([1.0, 1.0, -1.0])
+OFFSET_NUDILLOS_IZQ    = OFFSET_NUDILLOS * np.array([1.0, 1.0, -1.0])
 
 # Parámetros DH oficiales del FR5 (manual FAIRINO, tabla 2.4-5), DH estándar tipo UR
 DH_OFICIAL_FR5 = dict(d1=0.152, a2=-0.425, a3=-0.395, d4=0.102, d5=0.102, d6=0.100)
@@ -107,7 +112,28 @@ class CadenaFR5:
     T_base:    mundo → marco del primer eslabón (base_link del MJCF, con su inclinación).
     T_tool:    marco del último joint (wrist3, ya girado) → marco de herramienta (mano_mount).
     limites:   (6, 2) rad.
+
+    PERFIL (29-oct, para usar la misma teleoperación con otro brazo, ver CadenaArctos): los
+    atributos de clase de abajo son lo único del FR5 que necesitan retargeting, ik_teleop e
+    ik_diferencial además de la cinemática. Con estos valores todo da EXACTAMENTE lo mismo
+    que antes.
     """
+    robot = "FR5"
+    mano = "derecha"                                   # OrcaHand de la brida (convención de R_mano)
+    off_muneca = OFFSET_MUNECA_ORCA                    # articulación de la muñeca de la OrcaHand (herramienta)
+    off_palma = OFFSET_PALMA_ORCA
+    q_recto = np.array([0.0, 0.0, 0.0, 0.0, math.pi / 2, 0.0])   # brazo estirado, mano alineada
+    codo_recto = 0.0                                   # joint3 con el codo estirado
+    muneca_neutra = (0.0, math.pi / 2)                 # (joint4, joint5) con la mano alineada con el antebrazo
+    q5_sin_volteo = (math.radians(8.0), math.pi - math.radians(8.0))   # joint5 nunca pasa por 0 (volteo)
+    # puntos (marco k de fk_marcos, desplazamiento en ese marco) que hacen de hombro, codo,
+    # centro de la muñeca del robot y final del antebrazo
+    pt_hombro = (1, (0.0, 0.0, 0.0))
+    pt_codo = (2, (0.0, 0.0, 0.0))
+    pt_muneca_c = (4, (0.0, 0.0, 0.0))
+    pt_antebrazo = (3, (0.0, 0.0, 0.0))
+    capsulas_spec = None                               # None = las de ik_teleop.ModeloColision (FR5)
+    firma_por_codo = False                             # ik_diferencial: rama = firma_rama() (FR5)
 
     def __init__(self, eslabones, T_base, T_tool, limites, nombres=None, origen="?"):
         assert len(eslabones) == 6
@@ -123,16 +149,18 @@ class CadenaFR5:
 
     # ── construcción ─────────────────────────────────────────────────────────
     @classmethod
-    def desde_mjcf(cls, ruta, body_herramienta="mano_mount"):
-        """Lee base_link → joint1..6 → mano_mount de un MJCF del FR5 (fairino_mjcf.xml)."""
+    def desde_mjcf(cls, ruta, body_herramienta="mano_mount", body_base="base_link"):
+        """Lee base_link → joint1..6 → mano_mount de un MJCF del FR5 (fairino_mjcf.xml).
+        (29-oct) body_base / body_herramienta permiten leer el otro brazo del mismo MJCF
+        (ARCTOS: arctos_base_link → arctos_joint1..6 → mano_mount_izq)."""
         root = ET.parse(ruta).getroot()
         base = None
         for b in root.iter("body"):
-            if b.get("name") == "base_link":
+            if b.get("name") == body_base:
                 base = b
                 break
         if base is None:
-            raise ValueError(f"{ruta}: no hay <body name='base_link'>")
+            raise ValueError(f"{ruta}: no hay <body name='{body_base}'>")
 
         def R_de(b):
             if b.get("quat"):
@@ -239,22 +267,68 @@ class CadenaFR5:
         marcos.append(T @ self.T_tool)
         return marcos
 
+    @staticmethod
+    def _pt(marcos, spec):
+        """Punto (marco k, desplazamiento en ese marco) → mundo."""
+        k, off = spec
+        M = marcos[k]
+        if not any(off):
+            return M[:3, 3].copy()
+        return M[:3, :3] @ np.asarray(off, dtype=float) + M[:3, 3]
+
+    def puntos_brazo(self, marcos):
+        """(hombro, codo, centro de la muñeca del robot, final del antebrazo) en el mundo."""
+        return (self._pt(marcos, self.pt_hombro), self._pt(marcos, self.pt_codo),
+                self._pt(marcos, self.pt_muneca_c), self._pt(marcos, self.pt_antebrazo))
+
     def fk(self, q):
         """Dict con lo que usa la teleoperación (todo en el mundo)."""
         m = self.fk_marcos(q)
         Tt = m[6]
         return {
             "marcos": m,
-            "hombro": m[1][:3, 3].copy(),             # eje de joint2
-            "codo": m[2][:3, 3].copy(),               # eje de joint3
-            "muneca_fr5": m[4][:3, 3].copy(),         # eje de joint5 (centro de muñeca del FR5)
-            "brida": m[5][:3, 3].copy(),              # origen de wrist3 (joint6)
+            "hombro": self._pt(m, self.pt_hombro),    # FR5: eje de joint2
+            "codo": self._pt(m, self.pt_codo),        # FR5: eje de joint3
+            "muneca_fr5": self._pt(m, self.pt_muneca_c),   # centro de muñeca del robot (FR5: eje de joint5)
+            "brida": m[5][:3, 3].copy(),              # origen del marco de joint6
             "T_tool": Tt,
-            "muneca": Tt[:3, :3] @ OFFSET_MUNECA_ORCA + Tt[:3, 3],   # articulación de la OrcaHand
-            "palma": Tt[:3, :3] @ OFFSET_PALMA_ORCA + Tt[:3, 3],
+            "muneca": Tt[:3, :3] @ self.off_muneca + Tt[:3, 3],   # articulación de la OrcaHand
+            "palma": Tt[:3, :3] @ self.off_palma + Tt[:3, 3],
             "adelante": Tt[:3, 1].copy(),             # hand-forward (+Y de mano_mount)
             "ejes": [m_[:3, :3] @ e for m_, (_, e) in zip(m, self.eslabones)],
         }
+
+    # ── perfil: rama y dirección del brazo (FR5; CadenaArctos las redefine) ──
+    @staticmethod
+    def firma_rama(q):
+        """(codo, muñeca) ∈ {±1}²: signo de joint3 y de joint5 (la de ik_teleop.ControlIKFR5)."""
+        return (1 if q[2] >= 0 else -1, 1 if q[4] >= 0 else -1)
+
+    def q12_para_direccion(self, d_mundo, q_ref=None):
+        """(q1, q2) que ponen el brazo (hombro→codo) en la dirección d_mundo, en forma cerrada
+        (cadena UR: en el marco DH 0 el brazo apunta a −(c1·c2, s1·c2, s2)). Rama "normal"
+        (cos q2 ≥ 0); si q_ref se da, de las dos ramas se devuelve la más cercana."""
+        dh = self.dh_equivalente()
+        R0 = (self.T_base @ dh["T_0"])[:3, :3]
+        d = R0.T @ (np.asarray(d_mundo, float) / np.linalg.norm(d_mundo))
+        th2 = math.asin(float(np.clip(-d[2], -1.0, 1.0)))
+        c2 = math.cos(th2)
+        th1 = 0.0 if abs(c2) < 1e-9 else math.atan2(-d[1] / c2, -d[0] / c2)
+        s1, s2 = dh["signos"][0], dh["signos"][1]
+        cands = [(th1 * s1, th2 * s2), (wrap(th1 + math.pi) * s1, (math.pi - th2) * s2)]
+        if q_ref is None:
+            return cands[0]
+        return min(cands, key=lambda q: abs(wrap(q[0] - q_ref[0])) + abs(wrap(q[1] - q_ref[1])))
+
+    def r_hueco(self):
+        """Radio (m) del cilindro alrededor del eje de joint1 en el que el centro de la muñeca no
+        puede entrar sin cambiar de lado de hombro (FR5: d4). None = no hay hueco."""
+        return abs(float(self.dh_equivalente()["params"]["d4"]))
+
+    def escala_articular(self, q):
+        """Escala (6) de cada joint en la tarea principal (posición) de la IK diferencial, o None
+        (= 1). < 1 = ese joint "cuesta" más moverlo (pseudoinversa ponderada)."""
+        return None
 
     def punto(self, q, offset_tool):
         """Punto fijo en el marco de herramienta → mundo."""
@@ -537,3 +611,287 @@ def cargar_cadena(ruta_mjcf=None, verbose=True):
     if verbose:
         print("⚠️  Sin MJCF: cadena FR5 con los parámetros DH oficiales")
     return CadenaFR5.desde_dh()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ARCTOS (hombro IZQUIERDO del soporte, 29-oct)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class CadenaArctos(CadenaFR5):
+    """
+    Cadena del ARCTOS leída del MISMO fairino_mjcf.xml (arctos_base_link → arctos_joint1..6 →
+    mano_mount_izq) con el perfil que necesita la teleoperación del FR5 (retargeting, IK
+    diferencial, postura humana, colisiones). Todo lo demás (FK, jacobiana, IK numérica) es
+    el de CadenaFR5.
+
+    Estructura del ARCTOS (se comprueba al construir): brazo antropomórfico SIN desplazamiento
+    de hombro (el centro de la muñeca queda en el plano que contiene el eje de joint1) y
+    muñeca casi esférica (joint4 ‖ joint6 a lo largo del antebrazo, joint5 ⟂; sus ejes se
+    cruzan a 1,8 mm). Por eso la IK es ANALÍTICA como la del FR5:
+      · joint1: plano del brazo que contiene el centro de la muñeca (2 soluciones: hombro)
+      · joint2, joint3: triángulo hombro–codo–muñeca en ese plano (2 soluciones: codo)
+      · joint4..6: Euler Y-X-Y de la orientación que falta (2 soluciones: muñeca)
+    y una pasada de corrección quita casi todo el error de esos 1,8 mm (0,02 mm de mediana).
+
+    Diferencias con el FR5 que ven los demás módulos (atributos del perfil):
+      · codo recto con joint3 ≈ +1,49 rad (no 0); muñeca alineada con joint4 = joint5 = 0
+      · no hay "hueco" de hombro (r_hueco = None): el brazo PUEDE apuntar por el eje de
+        joint1; allí joint1 no está definido (ver escala_articular)
+      · la rama es solo el lado del codo (firma_por_codo); entre las dos soluciones que
+        quedan (codo a un lado u otro de la recta hombro–muñeca) elige la IK diferencial
+        con la continuidad y el lado humano del codo; la rama de la muñeca, la continuidad
+      · OrcaHand IZQUIERDA en mano_mount_izq (índice→meñique = +Z)
+    """
+    robot = "ARCTOS"
+    mano = "izquierda"
+    off_muneca = OFFSET_MUNECA_ORCA_IZQ
+    off_palma = OFFSET_PALMA_ORCA_IZQ
+    muneca_neutra = (0.0, 0.0)
+    q5_sin_volteo = None
+    firma_por_codo = True
+    iter_refino = 1                       # pasadas de corrección (muñeca no esférica: 1,8 mm → 0,02 mm)
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._geometria()
+
+    @classmethod
+    def desde_mjcf(cls, ruta, body_herramienta="mano_mount_izq", body_base="arctos_base_link"):
+        return super().desde_mjcf(ruta, body_herramienta=body_herramienta, body_base=body_base)
+
+    # ── geometría (una vez) ──────────────────────────────────────────────────
+    def _geometria(self):
+        """Constantes de la IK cerrada, medidas en el marco de joint1 (Link_1) con q = 0."""
+        z0 = np.zeros(6)
+        m = self.fk_marcos(z0)
+        F0 = m[0]                                         # marco de joint1 (gira con q1)
+        F0i = inv_T(F0)
+        loc = lambda M: F0i @ M                           # marco k → coordenadas de F0
+        ejes = [(loc(m[i])[:3, :3] @ self.eslabones[i][1]) for i in range(6)]
+        org = [loc(m[i])[:3, 3] for i in range(6)]
+        tol = 1e-6
+        ok = (np.allclose(np.abs(ejes[0]), [0, 0, 1], atol=tol) and np.allclose(np.abs(ejes[1]), [1, 0, 0], atol=tol)
+              and np.allclose(np.abs(ejes[2]), [1, 0, 0], atol=tol) and np.allclose(np.abs(ejes[3]), [0, 1, 0], atol=tol)
+              and np.allclose(np.abs(ejes[4]), [1, 0, 0], atol=tol) and np.allclose(np.abs(ejes[5]), [0, 1, 0], atol=tol))
+        if not ok:
+            raise ValueError("La cadena no tiene la estructura del ARCTOS (ejes z, x, x, y, x, y en Link_1)")
+        for i in (1, 2, 3, 4, 5):
+            if not np.allclose(self.eslabones[i][0][:3, :3], np.eye(3), atol=1e-9):
+                raise ValueError("CadenaArctos: los eslabones del ARCTOS no deben llevar giro fijo")
+        self._s = [float(np.sign(ejes[0][2])), float(np.sign(ejes[1][0])), float(np.sign(ejes[2][0])),
+                   float(np.sign(ejes[3][1])), float(np.sign(ejes[4][0])), float(np.sign(ejes[5][1]))]
+        # centro de la muñeca: punto del eje de joint4 más cercano al eje de joint5
+        p4, d4_ = org[3], ejes[3]
+        p5, d5_ = org[4], ejes[4]
+        w0 = p4 - p5
+        b = float(d4_ @ d5_)
+        t4 = (b * float(d5_ @ w0) - float(d4_ @ w0)) / max(1.0 - b * b, 1e-12)
+        C = p4 + t4 * d4_
+        self._sep_muneca = float(np.linalg.norm(np.cross(C - p5, d5_)))   # 1,8 mm en el ARCTOS
+        S, E = org[1], org[2]
+        self._x_c = float(C[0])                           # plano del brazo: x = x_c en Link_1
+        self._S = np.array([S[1], S[2]])
+        self._U = np.array([E[1] - S[1], E[2] - S[2]])
+        self._Fv = np.array([C[1] - E[1], C[2] - E[2]])
+        U_, F_ = self._U, self._Fv
+        self._UU, self._FF = float(U_ @ U_), float(F_ @ F_)
+        A_ = float(U_[0] * F_[0] + U_[1] * F_[1])
+        B_ = float(U_[1] * F_[0] - U_[0] * F_[1])
+        self._nAB, self._base3 = math.hypot(A_, B_), math.atan2(B_, A_)
+        self._F0i = inv_T(self.T_base @ self.eslabones[0][0])
+        self._R_F0 = (self.T_base @ self.eslabones[0][0])[:3, :3].copy()
+        # codo recto: R(s3·q3)·F paralelo a U
+        th = math.atan2(self._U[1], self._U[0]) - math.atan2(self._Fv[1], self._Fv[0])
+        self.codo_recto = float(wrap(th) * self._s[2])
+        # centro de la muñeca en el marco de la herramienta (aprox.: la muñeca no es del todo esférica)
+        Cw = F0[:3, :3] @ C + F0[:3, 3]
+        Tt = m[6]
+        self._c_tool = Tt[:3, :3].T @ (Cw - Tt[:3, 3])
+        # giro fijo tras joint6 hasta la herramienta
+        self._R_t = self.T_tool[:3, :3]
+        # puntos del perfil: hombro y codo en el PLANO del brazo; centro de muñeca en Link_4
+        self.pt_hombro = (1, tuple((m[1][:3, :3].T @ F0[:3, :3]) @ np.array([self._x_c - S[0], 0.0, 0.0])))
+        self.pt_codo = (2, tuple((m[2][:3, :3].T @ F0[:3, :3]) @ np.array([self._x_c - E[0], 0.0, 0.0])))
+        self.pt_muneca_c = (3, tuple(m[3][:3, :3].T @ (Cw - m[3][:3, 3])))
+        self.pt_antebrazo = self.pt_muneca_c
+        q = z0.copy()
+        q[2] = self.codo_recto
+        self.q_recto = q
+        # cápsulas (nombre, eslabón que la mueve, extremo a, extremo b, radio). Marco -1 = base
+        # (T_base), 6 = herramienta. Radios con margen sobre las mallas del ARCTOS.
+        self.capsulas_spec = (
+            ("base", -1, (-1, (0.0, 0.0, 0.03)), (-1, (0.0, 0.0, 0.25)), 0.10),
+            ("brazo", 1, self.pt_hombro, self.pt_codo, 0.06),
+            ("antebrazo", 2, self.pt_codo, self.pt_muneca_c, 0.05),
+            ("muneca", 4, self.pt_muneca_c, (5, (0.0, -0.05, 0.0)), 0.045),
+            ("mano", 5, (5, (0.0, -0.05, 0.0)), (6, (0.0, 0.26, 0.0)), 0.07),
+        )
+
+    # ── perfil ──────────────────────────────────────────────────────────────
+    def firma_rama(self, q):
+        """Solo el lado del codo respecto a recto (la rama de la muñeca no se fija)."""
+        return (1 if q[2] - self.codo_recto >= 0 else -1,)
+
+    def r_hueco(self):
+        """Sin hueco: el centro de la muñeca puede pasar por el eje de joint1 (ver abajo)."""
+        return None
+
+    def dh_equivalente(self):
+        raise ValueError("El ARCTOS no es un brazo tipo UR (no tiene parámetros DH equivalentes)")
+
+    def comparar_con_dh(self, *a, **kw):
+        return {}
+
+    def q12_para_direccion(self, d_mundo, q_ref=None):
+        """(q1, q2) que ponen el brazo (hombro→codo) en la dirección d_mundo. Dos ramas:
+        (q1, q2) y (q1 + π, −q2); sin q_ref, la de q1 más cerca de 0."""
+        F0 = self.T_base @ self.eslabones[0][0]           # marco de joint1 con q1 = 0
+        d = F0[:3, :3].T @ (np.asarray(d_mundo, float) / np.linalg.norm(d_mundo))
+        s1, s2 = self._s[0], self._s[1]
+        a = math.atan2(self._U[1], self._U[0]) - math.pi / 2     # el brazo con q2 = 0 apunta casi a +z
+        t2 = math.acos(float(np.clip(d[2], -1.0, 1.0)))   # ángulo desde el eje de joint1
+        if abs(math.sin(t2)) < 1e-9:
+            t1 = 0.0 if q_ref is None else float(q_ref[0]) * s1
+        else:
+            t1 = math.atan2(d[0], -d[1])                   # u = (sin t1·sin t2, −cos t1·sin t2, cos t2)
+        cands = [(wrap(th1) * s1, (th2 + a) * s2) for th1, th2 in ((t1, t2), (wrap(t1 + math.pi), -t2))]
+        if q_ref is None:
+            return min(cands, key=lambda q: abs(q[0]))
+        return min(cands, key=lambda q: abs(wrap(q[0] - q_ref[0])) + abs(wrap(q[1] - q_ref[1])))
+
+    # Brazo por el eje de joint1 (el ARCTOS no tiene hueco de hombro): ahí joint1 está indefinido
+    # y, con el ruido de la medida, el centro de la muñeca da vueltas alrededor del eje; la tarea
+    # de posición las seguiría con joint1 (y joint6 al revés) hasta los topes. Con el centro de la
+    # muñeca a menos de ref_q1_radio del eje, joint1 "cuesta" más en la tarea de posición
+    # (pseudoinversa ponderada): el error alrededor del eje (≤ ese radio) se deja y joint1 se
+    # queda. La referencia (IK analítica + lado humano del codo, ik_diferencial) sí lo puede girar.
+    ref_q1_radio = 0.10                   # m
+    escala_q1_min = 0.05                  # escala mínima de joint1 en la tarea de posición
+
+    def _radio_eje(self, q, marcos=None):
+        """Distancia (m) del centro de la muñeca al eje de joint1."""
+        m = self.fk_marcos(q) if marcos is None else marcos
+        C = self._pt(m, self.pt_muneca_c)
+        e = m[0][:3, :3] @ self.eslabones[0][1]
+        v = C - m[0][:3, 3]
+        return float(np.linalg.norm(v - float(v @ e) * e))
+
+    def escala_articular(self, q):
+        if self.ref_q1_radio <= 0:
+            return None
+        r = self._radio_eje(q)
+        if r >= self.ref_q1_radio:
+            return None
+        w = np.ones(6)
+        w[0] = max(self.escala_q1_min, r / self.ref_q1_radio)
+        return w
+
+    # ── IK analítica ────────────────────────────────────────────────────────
+    def _brazo(self, P0, i1, i3, q1_ref):
+        """(θ1, θ2, θ3) de la rama (i1, i3) que lleva el centro de la muñeca al punto P0 (marco
+        de joint1 con q1 = 0). Ángulos "geométricos" (q = θ·signo del eje). None si no llega."""
+        px, py, pz = float(P0[0]), float(P0[1]), float(P0[2])
+        r = math.hypot(px, py)
+        if r < 1e-6:                                   # sobre el eje de joint1: q1 libre → el de antes
+            th1 = q1_ref * self._s[0] + (math.pi if i1 else 0.0)
+        else:
+            if abs(self._x_c) > r:
+                return None
+            al = math.acos(float(np.clip(self._x_c / r, -1.0, 1.0)))
+            th1 = math.atan2(py, px) + (al if i1 else -al)
+        c1, s1_ = math.cos(th1), math.sin(th1)
+        U, Fv, S = self._U, self._Fv, self._S
+        D = np.array([-s1_ * px + c1 * py - S[0], pz - S[1]])
+        k = 0.5 * (float(D @ D) - self._UU - self._FF)
+        if abs(k) > self._nAB + 0.004:                 # (≈ 8 mm de margen: muñeca no esférica)
+            return None
+        th3 = self._base3 + (-1.0 if i3 else 1.0) * math.acos(float(np.clip(k / self._nAB, -1.0, 1.0)))
+        c3, s3_ = math.cos(th3), math.sin(th3)
+        th2 = math.atan2(D[1], D[0]) - math.atan2(U[1] + s3_ * Fv[0] + c3 * Fv[1],
+                                                  U[0] + c3 * Fv[0] - s3_ * Fv[1])
+        return th1, th2, th3
+
+    def _muneca(self, q, R_obj, i5, q4_ref):
+        """(θ4, θ5, θ6) de la rama i5 para la orientación R_obj con joint1..3 = q[:3]. Euler Y-X-Y.
+        Con la muñeca recta (singular) joint4 se queda en q4_ref y joint6 hace el giro."""
+        # marco de joint4 antes de girar: R_F0 · Rz(θ1) · Rx(θ2 + θ3) (eslabones sin giro fijo)
+        t1, t23 = q[0] * self._s[0], q[1] * self._s[1] + q[2] * self._s[2]
+        c1, s1_, c2, s2_ = math.cos(t1), math.sin(t1), math.cos(t23), math.sin(t23)
+        R_pre4 = self._R_F0 @ np.array([[c1, -s1_ * c2, s1_ * s2_],
+                                        [s1_, c1 * c2, -c1 * s2_],
+                                        [0.0, s2_, c2]])
+        M = R_pre4.T @ R_obj @ self._R_t.T
+        cb = float(np.clip(M[1, 1], -1.0, 1.0))
+        b = math.acos(cb)
+        if math.sin(b) < 1e-6:
+            if i5 or cb < 0:
+                return None
+            a_ = q4_ref * self._s[3]
+            return a_, b, math.atan2(M[0, 2], M[0, 0]) - a_
+        a_ = math.atan2(M[0, 1], M[2, 1])
+        c_ = math.atan2(M[1, 0], -M[1, 2])
+        return (a_ + math.pi, -b, c_ + math.pi) if i5 else (a_, b, c_)
+
+    def _error_pose(self, q, T):
+        Tt = self.fk_marcos(q)[6]
+        return float(np.linalg.norm(Tt[:3, 3] - T[:3, 3]) + 0.1 * np.linalg.norm(Tt[:3, :3] - T[:3, :3]))
+
+    def ik_analitica(self, T_tool_mundo, q_ref=None, incluir_fuera_de_limites=False, con_rama=False):
+        """Mismo contrato que CadenaFR5.ik_analitica: hasta 8 configuraciones (hombro × codo ×
+        muñeca) que ponen la herramienta en T_tool_mundo, normalizadas al equivalente (±2π)
+        más cercano a q_ref y dentro de límites (salvo incluir_fuera_de_limites).
+        rama = (i_hombro, i_muñeca, i_codo). Con la muñeca recta (joint5 ≈ 0, singular)
+        joint4 toma el valor de q_ref y joint6 el resto del giro.
+        La muñeca del ARCTOS no es del todo esférica (1,8 mm): la solución cerrada se corrige
+        con iter_refino pasadas de punto fijo (se desplaza el centro de muñeca pedido lo que
+        se equivocó la herramienta); la orientación sale exacta en cada pasada."""
+        T = np.asarray(T_tool_mundo, dtype=float)
+        q_ref = np.asarray(q_ref, dtype=float) if q_ref is not None else self.limites.mean(axis=1)
+        s = self._s
+        R_obj, p_obj = T[:3, :3], T[:3, 3]
+        C0 = R_obj @ self._c_tool + p_obj
+        sol = []
+        for i1 in (0, 1):
+            for i3 in (0, 1):
+                for i5 in (0, 1):
+                    Cw = C0.copy()
+                    q = None
+                    for it in range(1 + self.iter_refino):
+                        P0 = self._F0i[:3, :3] @ Cw + self._F0i[:3, 3]
+                        br = self._brazo(P0, i1, i3, float(q_ref[0]))
+                        if br is None:
+                            q = None
+                            break
+                        qq = np.array([br[0] * s[0], br[1] * s[1], br[2] * s[2], 0.0, 0.0, 0.0])
+                        mu = self._muneca(qq, R_obj, i5, float(q_ref[3]))
+                        if mu is None:
+                            q = None
+                            break
+                        qq[3:] = (mu[0] * s[3], mu[1] * s[4], mu[2] * s[5])
+                        q = qq
+                        if it < self.iter_refino:
+                            e = p_obj - self.fk_marcos(q)[6][:3, 3]
+                            if float(e @ e) < 1e-12:
+                                break
+                            Cw = Cw + e
+                    if q is None:
+                        continue
+                    qn = np.array([_equivalente(wrap(v), lo, hi, rf)
+                                   for v, (lo, hi), rf in zip(q, self.limites, q_ref)])
+                    dentro = bool(np.all(qn >= self.limites[:, 0] - 1e-9)
+                                  and np.all(qn <= self.limites[:, 1] + 1e-9))
+                    if dentro or incluir_fuera_de_limites:
+                        sol.append((qn, (i1, i5, i3)) if con_rama else qn)
+        return sol
+
+
+def cargar_cadena_arctos(ruta_mjcf=None, verbose=True):
+    """Cadena del ARCTOS (hombro izquierdo) del MJCF de config.RUTA_XML (o la ruta dada)."""
+    if ruta_mjcf is None:
+        from config import RUTA_XML as ruta_mjcf
+    c = CadenaArctos.desde_mjcf(ruta_mjcf)
+    if verbose:
+        print(f"🦾 Cadena ARCTOS leída de {os.path.basename(ruta_mjcf)} (hombro izquierdo; codo recto "
+              f"con arctos_joint3 = {math.degrees(c.codo_recto):.1f}°, muñeca a {1000 * c._sep_muneca:.1f} mm "
+              f"de esférica)")
+    return c

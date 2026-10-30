@@ -40,8 +40,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from skill_shield.teleop_fr5.cinematica import CadenaFR5, OFFSET_MUNECA_ORCA
-from skill_shield.teleop_fr5.ik_teleop import ControlIKFR5, ModeloColision, ParametrosIK, PosturaHumana
+from skill_shield.teleop_fr5.cinematica import CadenaFR5
+from skill_shield.teleop_fr5.ik_teleop import ModeloColision, ParametrosIK, PosturaHumana
 
 
 def _clip01(x):
@@ -119,6 +119,7 @@ class ParametrosIKDif:
     w_lim: float = 1.2            # m/rad fuera de la caja humana (coste, no prohibición)
     margen_suave_deg: float = 4.0 # el coste empieza este margen ANTES del borde de la caja
     margen_duro_deg: float = 20.0 # límite duro = caja humana ensanchada esto (∩ límites del FR5)
+    margen_duro_joint_deg: dict = None   # {joint 0..5: °} margen duro propio de algún joint (None = el de arriba)
     w_reg: float = 0.02           # m/rad hacia el q anterior (continuidad)
     lam: float = 0.02             # amortiguamiento base
     lam_sing: float = 0.12        # amortiguamiento extra cerca de una singularidad
@@ -138,6 +139,10 @@ class ParametrosIKDif:
     banda_q2_deg: tuple = (-150.0, 30.0)
     margen_eje_j1: float = 0.07   # m: el centro de muñeca del FR5 no se acerca al eje de joint1 a
                                   # menos de d4 + esto (allí se cambia de "lado de hombro")
+    penal_codo_lado: float = 1.5  # (cadenas con firma_por_codo: ARCTOS) coste de la referencia con el
+                                  # codo al lado contrario del tuyo (ver _coste_lado_codo); 0 = no
+    radio_lado_codo: float = 0.15 # m: ese coste solo cuenta con el centro de la muñeca a menos de
+                                  # esto del eje de joint1 (y crece al acercarse)
 
 
 class ControlIKDiferencial:
@@ -163,19 +168,25 @@ class ControlIKDiferencial:
             for i_, (a_, b_) in ((0, self.pd.banda_q1_deg), (1, self.pd.banda_q2_deg)):
                 self.lo_h[i_] = max(lo[i_], math.radians(a_))
                 self.hi_h[i_] = min(hi[i_], math.radians(b_))
-            md = math.radians(self.pd.margen_duro_deg)
+            md = np.full(6, math.radians(self.pd.margen_duro_deg))
+            for i_, g_ in (self.pd.margen_duro_joint_deg or {}).items():     # (ARCTOS: joint4)
+                md[int(i_)] = math.radians(g_)
             self.lo = np.maximum(lo, self.lo_h - md)
             self.hi = np.minimum(hi, self.hi_h + md)
             self.lo[:2], self.hi[:2] = lo[:2], hi[:2]       # hombro: tope duro = el del FR5
             # el codo NUNCA cruza al otro lado (sería cambiar de rama) y la muñeca nunca pasa
             # por q5 = 0 (muñeca volteada): esos dos bordes sí son duros
+            # (29-oct: respecto al codo recto de la cadena; el tope de q5 solo si la cadena lo
+            #  tiene — el FR5 sí, el ARCTOS no: su muñeca recta es q5 = 0 y no hay "volteo")
             hip = math.radians(max(self.par.codo_hiperext_deg, 1.0))
+            c0 = cadena.codo_recto
             if self.postura.codo_signo > 0:
-                self.lo[2] = max(self.lo[2], -hip)
+                self.lo[2] = max(self.lo[2], c0 - hip)
             else:
-                self.hi[2] = min(self.hi[2], hip)
-            self.lo[4] = max(self.lo[4], math.radians(8.0))
-            self.hi[4] = min(self.hi[4], math.pi - math.radians(8.0))
+                self.hi[2] = min(self.hi[2], c0 + hip)
+            if cadena.q5_sin_volteo is not None:
+                self.lo[4] = max(self.lo[4], cadena.q5_sin_volteo[0])
+                self.hi[4] = min(self.hi[4], cadena.q5_sin_volteo[1])
         else:
             self.lo_h, self.hi_h = lo.copy(), hi.copy()
             self.lo, self.hi = lo, hi
@@ -186,9 +197,10 @@ class ControlIKDiferencial:
         self.eje_j1 = cadena.fk(np.zeros(6))["ejes"][0]
         self.o_j1 = cadena.fk_marcos(np.zeros(6))[0][:3, 3]
         try:
-            self.r_hueco = abs(float(cadena.dh_equivalente()["params"]["d4"]))
+            self.r_hueco = cadena.r_hueco()               # FR5: d4 · ARCTOS: None (no hay hueco)
         except Exception:
             self.r_hueco = 0.13
+        self._hip_firma = math.radians(max(self.par.codo_hiperext_deg, 1.0)) + 1e-3
         self.q = None
         self.q_buena = None               # última postura de referencia alcanzable
         self._manip = 0.0
@@ -202,7 +214,14 @@ class ControlIKDiferencial:
     def en_limites(self, q):
         return bool(np.all(q >= self.lo - 1e-9) and np.all(q <= self.hi + 1e-9))
 
-    firma_rama = staticmethod(ControlIKFR5.firma_rama)
+    def firma_rama(self, q):
+        """Rama de la IK. FR5: (signo de joint3, signo de joint5) como siempre. Cadenas con
+        firma_por_codo (ARCTOS): solo el lado del codo, con el margen de hiperextensión del tope
+        duro (así el codo casi recto no "cambia de rama" por ruido)."""
+        if getattr(self.c, "firma_por_codo", False) and self.postura is not None:
+            sg = self.postura.codo_signo
+            return (sg if sg * (q[2] - self.c.codo_recto) >= -self._hip_firma else -sg,)
+        return self.c.firma_rama(q)
 
     def _valida(self, q):
         if not self.en_limites(q):
@@ -241,21 +260,55 @@ class ControlIKDiferencial:
         p_w = np.asarray(obj["p_muneca"], dtype=float)
         T = np.eye(4)
         T[:3, :3] = R
-        T[:3, 3] = p_w - R @ OFFSET_MUNECA_ORCA
+        T[:3, 3] = p_w - R @ self.c.off_muneca
         firma = self.firma_rama(q_prev)
         mg = math.radians(self.pd.margen_suave_deg)
         mejor = None
+        # (ARCTOS) lado humano del codo: solo cerca del eje de joint1, donde las dos soluciones
+        # están cerca y cambiar de una a otra es barato; lejos manda la continuidad (no hay saltos)
+        pen_lado = 0.0
+        if self.pd.penal_codo_lado > 0 and getattr(self.c, "firma_por_codo", False) \
+                and hasattr(self.c, "_radio_eje") and self.pd.radio_lado_codo > 0:
+            pen_lado = self.pd.penal_codo_lado * max(0.0, 1.0 - self.c._radio_eje(q_prev) / self.pd.radio_lado_codo)
         for s_, _ in self.c.ik_analitica(T, q_ref=q_prev, con_rama=True):
             if self.firma_rama(s_) != firma or not self.en_limites(s_):
                 continue
             if not all(self.lo_h[i] - mg <= s_[i] <= self.hi_h[i] + mg for i in (0, 1)):
                 continue
             d = self._dist(s_, q_prev)
+            if pen_lado > 0:
+                d += pen_lado * self._coste_lado_codo(s_, obj)
             if mejor is None or d < mejor[0]:
                 mejor = (d, s_)
         if mejor is None or not self.col.libre(mejor[1]):
             return None
         return mejor[1]
+
+    def _coste_lado_codo(self, q, obj):
+        """(29-oct, cadenas con firma_por_codo: ARCTOS) Con la rama solo por el lado del codo quedan
+        DOS soluciones para cada objetivo: el codo a un lado u otro de la recta hombro–muñeca (el
+        plano del brazo contiene siempre el eje de joint1). Lejos del eje la continuidad elige
+        bien, pero al pasar el centro de la muñeca por el eje de joint1 las dos quedan igual de
+        cerca y podía salir con el codo "hacia arriba". Penaliza la del codo en el lado contrario
+        al tuyo (o, con tu brazo casi recto, al de un codo que cae por su peso)."""
+        u = np.asarray(obj["p_muneca"], dtype=float) - self.hombro_robot
+        nu = float(np.linalg.norm(u))
+        if nu < 1e-6:
+            return 0.0
+        u /= nu
+        ref = None
+        d_b, d_a = obj.get("d_brazo"), obj.get("d_antebrazo")
+        if d_b is not None and d_a is not None and obj.get("p_codo_sugerido") is not None:
+            flex = math.degrees(math.acos(float(np.clip(np.dot(d_b, d_a), -1.0, 1.0))))
+            if flex >= self.pd.codo_flex_pleno_deg:
+                ref = np.asarray(obj["p_codo_sugerido"], dtype=float) - self.hombro_robot
+        if ref is None:
+            ref = np.array([0.0, 0.0, -1.0])
+        m = ref - float(ref @ u) * u
+        if float(np.linalg.norm(m)) < 0.3 * float(np.linalg.norm(ref)):
+            return 0.0                                    # sin lado claro (p. ej. brazo vertical)
+        e = self.c.fk(q)["codo"] - self.hombro_robot
+        return 1.0 if float(e @ m) < 0.0 else 0.0
 
     def _dist(self, qa, qb):
         d = np.array([((a - b + math.pi) % (2 * math.pi)) - math.pi for a, b in zip(qa, qb)])
@@ -288,6 +341,11 @@ class ControlIKDiferencial:
         ent = self.col.entorno
         if getattr(self, "_esf_ent", None) is None:
             self._esf_ent = [_esfera(o) for o in ent.capsulas]
+        if getattr(self, "_ult", None) is None:
+            self._ult = {n: self.col.ultimo_joint(n) for n in caps}
+        obst = list(zip(ent.capsulas, self._esf_ent))
+        if ent.dinamicas:                                 # el otro brazo (cambia cada fotograma)
+            obst += [(o, _esfera(o)) for o in ent.dinamicas]
         filas, rhs = [], []
 
         def fila(n, J, d):
@@ -296,13 +354,13 @@ class ControlIKDiferencial:
 
         for nombre in ("brazo", "antebrazo", "muneca", "mano"):
             c = caps[nombre]
-            k = _ULTIMO_JOINT[nombre]
+            k = self._ult[nombre]
             if ent.z_suelo is not None:
                 p = c.a if c.a[2] <= c.b[2] else c.b
                 d = float(p[2]) - c.r - ent.margen - ent.z_suelo
                 if d < pd.d_col_activa:
                     fila(np.array([0.0, 0.0, 1.0]), self._jac_punto(m, p, k, WO), d)
-            for o, eo in zip(ent.capsulas, self._esf_ent):
+            for o, eo in obst:
                 if _lejos(esf[nombre], eo, pd.d_col_activa + ent.margen):
                     continue
                 pa, pb = _puntos_cercanos(c.a, c.b, o.a, o.b)
@@ -320,8 +378,8 @@ class ControlIKDiferencial:
             dist = float(np.linalg.norm(v))
             d = dist - ca.r - cb.r
             if d < pd.d_col_activa and dist > 1e-6:
-                Ja = self._jac_punto(m, pa, _ULTIMO_JOINT[a_], WO)
-                Jb = self._jac_punto(m, pb, _ULTIMO_JOINT[b_], WO)
+                Ja = self._jac_punto(m, pa, self._ult[a_], WO)
+                Jb = self._jac_punto(m, pb, self._ult[b_], WO)
                 fila(v / dist, Ja - Jb, d)
         # banda del hombro (q1, q2): barrera de la misma prioridad que la posición, para que el
         # robot no "dé la vuelta" alrededor del eje de joint1 persiguiendo un objetivo
@@ -335,14 +393,16 @@ class ControlIKDiferencial:
                 filas.append(f_[None, :])
                 rhs.append(np.array([pd.w_col * r_]))
         # hueco del hombro: centro de muñeca (origen del marco de joint5) lejos del eje de joint1
-        p5 = m[4][:3, 3]
-        v = p5 - self.o_j1
-        rad = v - float(v @ self.eje_j1) * self.eje_j1
-        r = float(np.linalg.norm(rad))
-        r_act = self.r_hueco + pd.margen_eje_j1
-        if r < r_act and r > 1e-6:
-            filas.append(pd.w_col * ((rad / r) @ self._jac_punto(m, p5, 3, WO))[None, :])
-            rhs.append(np.array([pd.w_col * (r_act - r)]))
+        # (29-oct: solo si la cadena tiene hueco — el ARCTOS no)
+        if self.r_hueco is not None:
+            p5 = self.c._pt(m, self.c.pt_muneca_c)
+            v = p5 - self.o_j1
+            rad = v - float(v @ self.eje_j1) * self.eje_j1
+            r = float(np.linalg.norm(rad))
+            r_act = self.r_hueco + pd.margen_eje_j1
+            if r < r_act and r > 1e-6:
+                filas.append(pd.w_col * ((rad / r) @ self._jac_punto(m, p5, 3, WO))[None, :])
+                rhs.append(np.array([pd.w_col * (r_act - r)]))
         if not filas:
             return None
         return np.vstack(filas), np.concatenate(rhs)
@@ -356,7 +416,7 @@ class ControlIKDiferencial:
         Tt = m[6]
         Rt = Tt[:3, :3]
         p_w = np.asarray(obj["p_muneca"], dtype=float)
-        p = Rt @ OFFSET_MUNECA_ORCA + Tt[:3, 3]
+        p = Rt @ self.c.off_muneca + Tt[:3, 3]
         WO = self._ejes_mundo(m)
         Jl, Ja = np.cross(WO[0], p - WO[1]).T, WO[0].T
         J1, e1 = Jl, p_w - p
@@ -388,9 +448,10 @@ class ControlIKDiferencial:
                 nn = float(np.linalg.norm(n))
                 if nn > 1e-3:
                     n /= nn
-                    o = P @ (m[2][:3, 3] - self.hombro_robot)        # desplazamiento actual del codo
+                    p_c = self.c._pt(m, self.c.pt_codo)
+                    o = P @ (p_c - self.hombro_robot)               # desplazamiento actual del codo
                     h = max(float(np.linalg.norm(o)), 0.05)
-                    Je = self._jac_punto(m, m[2][:3, 3], 1, WO)
+                    Je = self._jac_punto(m, p_c, 1, WO)
                     filas.append(w_c * (P @ Je))
                     rhs.append(w_c * (h * n - o))
         # límites humanos como coste (empieza margen_suave antes del borde)
@@ -426,7 +487,7 @@ class ControlIKDiferencial:
         """Lo que hace falta para el estado/motivo (sin jacobianas ni colisiones: barato)."""
         Tt = self.c.fk_marcos(q)[6]
         Rt = Tt[:3, :3]
-        p = Rt @ OFFSET_MUNECA_ORCA + Tt[:3, 3]
+        p = Rt @ self.c.off_muneca + Tt[:3, 3]
         f = obj["R_mano"][:, 1]
         f = f / np.linalg.norm(f)
         ms = math.radians(self.pd.margen_suave_deg)
@@ -459,7 +520,12 @@ class ControlIKDiferencial:
             e = np.concatenate([e1, e2])
             dq = np.linalg.solve(J.T @ J + lam ** 2 * np.eye(6), J.T @ e)
         else:
-            J1p = J1.T @ np.linalg.inv(J1 @ J1.T + lam ** 2 * np.eye(J1.shape[0]))
+            Wv = self.c.escala_articular(q)                # FR5: None · ARCTOS: joint1 caro sobre su eje
+            if Wv is None:
+                J1p = J1.T @ np.linalg.inv(J1 @ J1.T + lam ** 2 * np.eye(J1.shape[0]))
+            else:                                          # pseudoinversa ponderada (sigue siendo J1·J1p ≈ I)
+                J1w = J1 * Wv
+                J1p = Wv[:, None] * (J1w.T @ np.linalg.inv(J1w @ J1w.T + lam ** 2 * np.eye(J1.shape[0])))
             dq1 = J1p @ e1
             N1 = np.eye(6) - J1p @ J1
             J2n = J2 @ N1
@@ -542,6 +608,6 @@ class ControlIKDiferencial:
 
     def _alcance(self):
         if not hasattr(self, "_alc"):
-            p = self.c.fk(np.array([0.0, 0.0, 0.0, 0.0, math.pi / 2, 0.0]))["muneca"]
+            p = self.c.fk(np.array(self.c.q_recto, dtype=float))["muneca"]
             self._alc = float(np.linalg.norm(p - self.hombro_robot))
         return self._alc

@@ -22,6 +22,10 @@ Medida humana (hombro, codo, muñeca, mano) → objetivo del FR5, con LÍMITES H
 Convención de la OrcaHand derecha (medida en orcahand_right_body.xml, marco mano_mount):
    +Y = adelante (dedos) · −Z = lateral índice→meñique · −X = normal de la palma (hacia donde
    se cierran los dedos). R_mano_mount = [ −n | f | −l ] con n = f × l.
+OrcaHand IZQUIERDA (29-oct, ARCTOS, marco mano_mount_izq): espejo de la derecha, así que
+   +Y = dedos · +Z = índice→meñique · −X = palma. R = [ −n | f | l ] con n = l × f.
+   El lado lo dice la cadena (cadena.mano); para el brazo izquierdo, además, los ejes "fuera"
+   del robot apuntan a +X (ConfigRetargeting.fuera) y la fusión mide tu brazo IZQUIERDO.
 """
 import math
 from dataclasses import dataclass
@@ -174,7 +178,8 @@ class ConfigRetargeting:
     roll_tau_s: float = 0.12             # s: suavizado exponencial de la pronosupinación medida
     roll_max_vel: float = 4.0            # rad/s máx. de cambio del roll (filtra saltos de MediaPipe)
     roll_rango_deg: float = 120.0        # pronosupinación máxima a cada lado del neutro (humano ≈ ±90°)
-    offset_muneca_robot: tuple = (0.0, 0.0923, 0.010)   # OrcaHand: articulación de la muñeca (mano_mount)
+    offset_muneca_robot: tuple = None    # OrcaHand: articulación de la muñeca (mano_mount); None = la de
+                                         # la cadena (FR5 + derecha: (0, 0.0923, 0.010))
 
 
 class Retargeting:
@@ -185,6 +190,7 @@ class Retargeting:
         self.ejes = np.column_stack([np.asarray(self.cfg.fuera, float), np.asarray(self.cfg.arriba, float),
                                      np.asarray(self.cfg.delante, float)])     # (fuera, arriba, delante) → mundo
         self.hombro_robot = cadena.fk(np.zeros(6))["hombro"]
+        self.izquierda = getattr(cadena, "mano", "derecha") == "izquierda"
         self.alcance_robot = self._alcance_robot()
         self.L1_robot = float(np.linalg.norm(cadena.fk(np.zeros(6))["codo"] - self.hombro_robot))
         self.roll = 0.0                        # último giro de pronosupinación (rad)
@@ -198,9 +204,11 @@ class Retargeting:
         """Máxima distancia hombro → articulación de la muñeca de la OrcaHand (brazo recto, muñeca
         recta: joint4 = 0, joint5 = +90°)."""
         c = self.cadena
-        q = np.array([0.0, 0.0, 0.0, 0.0, math.pi / 2, 0.0])
+        q = np.array(getattr(c, "q_recto", [0.0, 0.0, 0.0, 0.0, math.pi / 2, 0.0]), dtype=float)
         p = c.fk(q)["T_tool"]
-        pw = p[:3, :3] @ np.asarray(self.cfg.offset_muneca_robot) + p[:3, 3]
+        off = self.cfg.offset_muneca_robot
+        off = getattr(c, "off_muneca", (0.0, 0.0923, 0.010)) if off is None else off
+        pw = p[:3, :3] @ np.asarray(off, dtype=float) + p[:3, 3]
         return float(np.linalg.norm(pw - self.hombro_robot))
 
     # ── de la cámara A al torso y al robot ────────────────────────────────────
@@ -323,6 +331,8 @@ class Retargeting:
         f = _u(f)
         ref = self._ref_roll(f)
         l = rot_eje(f, roll) @ ref
+        if self.izquierda:               # mano izquierda (espejo): palma n = l × f, R = [−n | f | l]
+            return np.column_stack([-np.cross(l, f), f, l])
         n = np.cross(f, l)               # normal de la palma (hacia donde cierran los dedos)
         return np.column_stack([-n, f, -l])
 
@@ -337,6 +347,6 @@ class Retargeting:
     def roll_desde_R(self, R):
         """Inversa de R_mano: pronosupinación de una orientación dada (para arrancar sin saltos)."""
         f = R[:, 1]
-        l = -R[:, 2]
+        l = R[:, 2] if self.izquierda else -R[:, 2]
         ref = self._ref_roll(f)
         return math.atan2(float(np.cross(ref, l) @ f), float(ref @ l))

@@ -6,6 +6,7 @@ fusion_muneca_codo, retargeting e ik_teleop sin la sala.
 
     python -m skill_shield.teleop_fr5.simulador            # informe por fases
     python -m skill_shield.teleop_fr5.simulador --plot     # además dibuja los errores (matplotlib)
+    python -m skill_shield.teleop_fr5.simulador --bimanual # (29-oct) FR5 + ARCTOS con tus dos brazos
 """
 import json
 import math
@@ -394,10 +395,153 @@ def simular_teleop(ruta_mjcf=None, duracion=21.0, fps=25.0, semilla=0, verbose=T
     return res, serie
 
 
+def observar_dos_brazos(cs: CamaraSintetica, der, izq, C, C2, t):
+    """(29-oct) Como CamaraSintetica.observar pero con los DOS brazos (der/izq = (S, E, W) en el
+    marco A): los landmarks de Pose de los dos y, en cada uno, los mismos defectos (codo
+    inventado y profundidad de la palma con el antebrazo hacia la cámara). Sin silueta de mano."""
+    from skill_shield.teleop_fr5.fusion_muneca_codo import PS_CODO_IZQ, PS_MUNECA_IZQ
+    brazos = ((PS_HOMBRO_DER, PS_CODO_DER, PS_MUNECA_DER, der), (PS_HOMBRO_IZQ, PS_CODO_IZQ, PS_MUNECA_IZQ, izq))
+    pc = {PS_CADERA_DER: cs.cam.de_A(C), PS_CADERA_IZQ: cs.cam.de_A(C2)}
+    ocl = {}
+    for ih, ic, im, (S, E, W) in brazos:
+        pc[ih], pc[ic], pc[im] = cs.cam.de_A(S), cs.cam.de_A(E), cs.cam.de_A(W)
+        da = pc[im] - pc[ic]
+        da /= np.linalg.norm(da)
+        rw = pc[im] / np.linalg.norm(pc[im])
+        ang = math.degrees(math.acos(min(1.0, abs(float(da @ rw)))))
+        ocl[ic] = (ang < cs.ang_oclusion and float(da @ rw) < 0, im)
+    lm = {}
+    for k, p in pc.items():
+        px = cs.intr.proyectar(p)
+        if px is None:
+            continue
+        vis = 0.95
+        px = px + cs.rng.normal(0, cs.sigma_pix, 2)
+        if k in ocl and ocl[k][0]:
+            pw = cs.intr.proyectar(pc[ocl[k][1]])
+            if pw is not None:
+                px, vis = pw + cs.rng.normal(0, 12.0, 2), 0.75
+        lm[k] = (px[0] / cs.intr.ancho, px[1] / cs.intr.alto, vis)
+    z_true = {k: float(p[2]) for k, p in pc.items()}
+    pix_true = {k: cs.intr.proyectar(p) for k, p in pc.items()}
+
+    def z_func(u, v):
+        if cs.rng.random() < cs.p_hueco:
+            return None
+        mejor, zbest = 1e9, None
+        for k, px in pix_true.items():
+            if px is None:
+                continue
+            d = np.linalg.norm(np.array([u, v]) - px)
+            if d < mejor:
+                mejor, zbest = d, z_true[k]
+        for ic, (oc, im) in ocl.items():
+            pw = pix_true[im]
+            if oc and pw is not None and np.linalg.norm(np.array([u, v]) - pw) < 0.12 * cs.intr.fx / max(z_true[im], 0.3):
+                zbest = min(zbest, z_true[im] - 0.14)
+        if zbest is None:
+            return None
+        return zbest + cs.rng.normal(0, cs.sigma_z_k * zbest * zbest)
+    return ObservacionCamara(lm, None, cs.intr, z_func=z_func, t=t)
+
+
+def simular_bimanual(ruta_mjcf=None, duracion=21.0, fps=25.0, semilla=0, espejo=True, verbose=True):
+    """(29-oct) FR5 + ARCTOS a la vez, como en la app: tus dos brazos sintéticos (el izquierdo,
+    espejo del derecho, o el mismo movimiento retrasado medio ciclo con espejo=False) vistos por
+    las dos cámaras sintéticas → la teleop del FR5 (brazo derecho) y la del ARCTOS (brazo
+    izquierdo) con las MISMAS cámaras y parámetros de fusión, calibrando a la vez y viéndose
+    como obstáculo. Comprueba que los dos siguen su muñeca, sin límites, sin chocar entre sí.
+
+        python -m skill_shield.teleop_fr5.simulador --bimanual"""
+    from skill_shield.teleop_fr5.brazo_arctos import capsulas_de, compartir_obstaculos, construir_teleop_arctos
+    from skill_shield.teleop_fr5.cinematica import cargar_cadena
+    from skill_shield.teleop_fr5.ik_teleop import _dist_segmentos, entorno_soporte_hombros
+    from skill_shield.teleop_fr5.retargeting import ConfigRetargeting
+    from skill_shield.teleop_fr5.teleop_brazo import ConfigTeleop, TeleopBrazoFR5
+
+    if ruta_mjcf is None:
+        ruta_mjcf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                                 "fairino_description", "mjcf", "fairino_mjcf.xml")
+    rng = np.random.default_rng(semilla)
+    humano = BrazoHumanoSintetico()
+    R_ab, t_ab = cargar_extrinsecas_repo()
+    cam_a, cam_b = CamaraSintetica("A", rng=rng), CamaraSintetica("B", R_ab, t_ab, rng=rng)
+    camaras = {"A": cam_a.cam, "B": cam_b.cam}
+    der = TeleopBrazoFR5(cadena=cargar_cadena(ruta_mjcf, verbose=False), camaras=camaras, verbose=verbose,
+                         cfg=ConfigTeleop(auto_extrinseca=False, vigilar_extrinseca=False),
+                         cfg_retarget=ConfigRetargeting(z_min=-0.975 + 0.25),
+                         entorno=entorno_soporte_hombros())
+    izq = construir_teleop_arctos(ruta_mjcf, camaras, par_fusion=der.fusor.par, verbose=verbose)
+    der.iniciar_calibracion()
+    izq.iniciar_calibracion()
+    q0 = {"der": np.array([0.0, -1.5708, 1.35, 0.0, 1.5708, 0.0]), "izq": np.array([0.0, 0.0, 0.21, 0.0, 0.0, 0.0])}
+    q_act = dict(q0)
+    xm = 0.5 * (humano.S[0] + humano.S2[0])
+    esp = lambda p: np.array([2 * xm - p[0], p[1], p[2]])
+    lat = {"der": None, "izq": None}
+    serie = []
+    n = int(duracion * fps)
+    for k in range(n):
+        t = k / fps
+        S, E, W, fase = humano.pose(t)
+        if espejo:
+            SL, EL, WL = esp(S), esp(E), esp(W)
+        else:
+            S_, E_, W_, _ = humano.pose((t + 10.5) % 21.0)
+            SL, EL, WL = esp(S_), esp(E_), esp(W_)
+        oa = observar_dos_brazos(cam_a, (S, E, W), (SL, EL, WL), humano.C, humano.C2, t)
+        ob = observar_dos_brazos(cam_b, (S, E, W), (SL, EL, WL), humano.C, humano.C2, t)
+        fila = dict(t=t, fase=fase)
+        compartir_obstaculos(der, q_act["der"], izq, q_act["izq"])
+        for nombre, tel, (e_, w_), arriba in (("der", der, (E, W), np.array([0.0, -1.0, 0.0])),
+                                              ("izq", izq, (EL, WL), np.array([0.0, -1.0, 0.0]))):
+            f_h = (w_ - e_) / np.linalg.norm(w_ - e_)
+            if lat[nombre] is None:
+                lat[nombre] = np.cross(f_h, arriba) * (1.0 if nombre == "der" else -1.0)
+            l_h = lat[nombre] - float(lat[nombre] @ f_h) * f_h
+            lat[nombre] = l_h / max(np.linalg.norm(l_h), 1e-9)
+            q, info = tel.actualizar({"A": oa, "B": ob}, t, mano=(f_h, lat[nombre]), q_actual=q_act[nombre],
+                                     dt=1.0 / fps)
+            fila[nombre] = info.get("estado")
+            if q is not None and tel.obj_prev is not None:
+                pw = tel.cadena.fk(q)["muneca"]
+                fila[nombre + "_err"] = float(np.linalg.norm(pw - tel.obj_prev["p_muneca"]))
+                fila[nombre + "_lim"] = bool(tel.ik.en_limites(q))
+                q_act[nombre] = q.copy()
+        # distancia mínima entre los dos brazos (cápsulas, sin radios)
+        cd = capsulas_de(der, q_act["der"])
+        ci = capsulas_de(izq, q_act["izq"])
+        fila["sep"] = min(_dist_segmentos(a.a, a.b, b.a, b.b) - a.r - b.r for a in cd for b in ci)
+        serie.append(fila)
+    res = {}
+    for nombre in ("der", "izq"):
+        est = {}
+        for x in serie:
+            est[x[nombre]] = est.get(x[nombre], 0) + 1
+        e = np.array([x[nombre + "_err"] for x in serie if nombre + "_err" in x and x[nombre] in ("exacta", "aprox")])
+        res[nombre] = dict(estados=est, err_med=float(np.median(e)) if len(e) else float("nan"),
+                           err_p95=float(np.percentile(e, 95)) if len(e) else float("nan"),
+                           fuera_limites=sum(1 for x in serie if x.get(nombre + "_lim") is False),
+                           huesos=tuple(round(100 * v, 1) for v in (der if nombre == "der" else izq).calib.longitudes or ()))
+    res["sep_min"] = float(min(x["sep"] for x in serie))
+    res["choques_entre_brazos"] = sum(1 for x in serie if x["sep"] < 0)
+    if verbose:
+        for nombre, rob in (("der", "FR5 (brazo derecho)"), ("izq", "ARCTOS (brazo izquierdo)")):
+            r = res[nombre]
+            print(f"{rob:26s} {r['estados']}  error muñeca med {100 * r['err_med']:.2f} cm p95 "
+                  f"{100 * r['err_p95']:.2f} cm · fuera de límites {r['fuera_limites']} · huesos {r['huesos']} cm")
+        print(f"separación mínima entre los dos brazos: {100 * res['sep_min']:.1f} cm "
+              f"({res['choques_entre_brazos']} fotogramas tocándose)")
+    return res, serie
+
+
 if __name__ == "__main__":
     import sys
     if "--teleop" in sys.argv:
         simular_teleop()
+        sys.exit(0)
+    if "--bimanual" in sys.argv:
+        simular_bimanual()
         sys.exit(0)
     resumen, serie = simular_fusion()
     if "--plot" in sys.argv:

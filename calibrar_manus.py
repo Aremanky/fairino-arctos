@@ -8,6 +8,9 @@ Calibración guante MANUS → OrcaHand, IMITACIÓN 1:1  (manus_calibracion.json,
     python calibrar_manus.py --recalcular # rehacer el mapeo con las poses YA grabadas en
                                           # manus_calibracion.json (sin guante; guarda copia).
                                           # Sirve también para pasar una calibración v3 a 1:1.
+    python calibrar_manus.py --izquierda  # (29-oct) lo mismo con el guante IZQUIERDO, para la
+                                          # OrcaHand del ARCTOS → manus_calibracion_izq.json
+                                          # (vale con --ver, --probar y --recalcular)
 
 QUÉ HACE (v4, 15-oct)
   El robot copia tus ángulos GRADO A GRADO (ver la cabecera de manus_guante.py):
@@ -48,6 +51,15 @@ from skill_shield.mano.manus_guante import (
 )
 
 ESPERA_S, MEDIR_S = 2.0, 1.5
+
+# 29-oct: --izquierda calibra el guante IZQUIERDO (OrcaHand del ARCTOS) en su propio archivo
+IZQUIERDA = "--izquierda" in sys.argv
+if IZQUIERDA:
+    import config as _cfg
+    RUTA_CAL = getattr(_cfg, "MANUS_CALIBRACION_IZQ",
+                       os.path.join(os.path.dirname(os.path.abspath(__file__)), "manus_calibracion_izq.json"))
+else:
+    RUTA_CAL = MANUS_CALIBRACION
 
 # (clave, texto que se muestra)
 POSES = [
@@ -133,8 +145,9 @@ def guardar(ruta, mapeo, medidas, fecha=None, extra=None):
         json.dump(d, fh, indent=2, ensure_ascii=False)
 
 
-def recalcular(ruta=MANUS_CALIBRACION):
+def recalcular(ruta=None):
     """Rehace el mapeo 1:1 con las poses crudas ya grabadas (sin guante). Guarda copia."""
+    ruta = ruta or RUTA_CAL
     if not os.path.exists(ruta):
         print(f"❌ No existe {ruta}")
         return 1
@@ -161,7 +174,7 @@ def recalcular(ruta=MANUS_CALIBRACION):
     guardar(ruta, mapeo, medidas, fecha=d.get("fecha"),
             extra={"recalculado": time.strftime("%Y-%m-%d %H:%M")})
     print(f"\n💾 Mapeo (modo '{MANUS_MAPEO}') guardado en {ruta}\n   (copia de la anterior: {copia})")
-    cargar_calibracion(verbose=True)
+    cargar_calibracion(ruta, verbose=True)
     return 0
 
 
@@ -186,7 +199,13 @@ def main():
     if "--recalcular" in sys.argv:
         return recalcular()
 
-    guante = GuanteManus(tactil=False)
+    if IZQUIERDA:
+        print("🧤 Guante IZQUIERDO (OrcaHand del ARCTOS) → " + os.path.basename(RUTA_CAL))
+        guante = GuanteManus(tactil=False, lado="izquierdo")
+        if os.path.exists(RUTA_CAL):
+            guante.mapeo = cargar_calibracion(RUTA_CAL, verbose=False)
+    else:
+        guante = GuanteManus(tactil=False)
     if not guante.iniciar():
         return 1
     print("Esperando datos del guante...")
@@ -260,9 +279,9 @@ def main():
     mapeo, informe = construir_mapeo(medidas)
     informar(informe)
     comprobar(medidas, mapeo)
-    guardar(MANUS_CALIBRACION, mapeo, medidas)
-    print(f"\n💾 Guardado en {MANUS_CALIBRACION}. Skill Shield lo carga al arrancar.")
-    cargar_calibracion(verbose=True)
+    guardar(RUTA_CAL, mapeo, medidas)
+    print(f"\n💾 Guardado en {RUTA_CAL}. Skill Shield lo carga al arrancar.")
+    cargar_calibracion(RUTA_CAL, verbose=True)
     print("Retoque fino sin recalibrar: config.MANUS_GANANCIA multiplica cada articulación "
           "(1.0 = como sale de la calibración).")
     return 0

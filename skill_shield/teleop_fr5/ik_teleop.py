@@ -29,9 +29,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from skill_shield.teleop_fr5.cinematica import (
-    CadenaFR5, OFFSET_MUNECA_ORCA, T_de, wrap,
-)
+from skill_shield.teleop_fr5.cinematica import CadenaFR5, T_de, wrap
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -83,10 +81,13 @@ class Capsula:
 
 @dataclass
 class Entorno:
-    """Obstáculos fijos: suelo (z) y cápsulas (columna del soporte, mesa...)."""
+    """Obstáculos fijos: suelo (z) y cápsulas (columna del soporte, mesa...).
+    dinamicas (29-oct): cápsulas que cambian cada fotograma (el OTRO brazo del soporte); las
+    pone el bucle principal antes de resolver (ver teleop_fr5/bimanual.py)."""
     z_suelo: float = None
     capsulas: list = field(default_factory=list)
     margen: float = 0.03
+    dinamicas: list = None
 
 
 def entorno_soporte_hombros(z_suelo=-0.975):
@@ -110,6 +111,9 @@ class ModeloColision:
 
     def capsulas(self, q, marcos=None):
         m = self.c.fk_marcos(q) if marcos is None else marcos
+        spec = getattr(self.c, "capsulas_spec", None)
+        if spec:                                   # otro brazo (p. ej. ARCTOS): cápsulas de su perfil
+            return [Capsula(n, self._pt(m, a), self._pt(m, b), r) for n, _, a, b, r in spec]
         base = self.c.T_base[:3, 3]
         hombro, codo, wrist1 = m[1][:3, 3], m[2][:3, 3], m[3][:3, 3]
         brida = m[5][:3, 3]
@@ -122,6 +126,21 @@ class ModeloColision:
             Capsula("muneca", wrist1, brida, self.R_MUNECA),
             Capsula("mano", brida, punta, self.R_MANO),
         ]
+
+    def _pt(self, m, spec):
+        """(marco k, desplazamiento) → mundo; k = −1 es la base (T_base) y 6 la herramienta."""
+        k, off = spec
+        M = self.c.T_base if k < 0 else m[k]
+        return M[:3, :3] @ np.asarray(off, dtype=float) + M[:3, 3]
+
+    def ultimo_joint(self, nombre):
+        """Último joint (0..5) que mueve la cápsula 'nombre' (−1 = fija)."""
+        spec = getattr(self.c, "capsulas_spec", None)
+        if spec:
+            for n, k, *_ in spec:
+                if n == nombre:
+                    return k
+        return {"base": -1, "brazo": 1, "antebrazo": 2, "muneca": 4, "mano": 5}[nombre]
 
     PARES_PROPIOS = (("mano", "brazo"), ("mano", "base"), ("muneca", "brazo"), ("muneca", "base"),
                      ("antebrazo", "base"))
@@ -136,13 +155,14 @@ class ModeloColision:
             if d < 0.0:
                 out.append((a, b, -d))
         ent = self.entorno
+        otras = list(ent.capsulas) + list(ent.dinamicas or ())
         for nombre in ("brazo", "antebrazo", "muneca", "mano"):
             c = caps[nombre]
             if ent.z_suelo is not None:
                 z = min(float(c.a[2]), float(c.b[2])) - c.r - ent.margen
                 if z < ent.z_suelo:
                     out.append((nombre, "suelo", ent.z_suelo - z))
-            for o in ent.capsulas:
+            for o in otras:
                 d = _dist_segmentos(c.a, c.b, o.a, o.b) - c.r - o.r - ent.margen
                 if d < 0.0:
                     out.append((nombre, o.nombre, -d))
@@ -242,30 +262,21 @@ class PosturaHumana:
 
     def q12_para_direccion(self, d_mundo, q_ref=None):
         """(q1, q2) que ponen el brazo (hombro→codo) del robot en la dirección d_mundo, en forma
-        cerrada (cadena UR: en el marco DH 0 el brazo apunta a −(c1·c2, s1·c2, s2)). Rama "normal"
-        (cos q2 ≥ 0); si q_ref se da, de las dos ramas se devuelve la más cercana."""
-        dh = self.c.dh_equivalente()
-        R0 = (self.c.T_base @ dh["T_0"])[:3, :3]
-        d = R0.T @ (np.asarray(d_mundo, float) / np.linalg.norm(d_mundo))
-        th2 = math.asin(float(np.clip(-d[2], -1.0, 1.0)))
-        c2 = math.cos(th2)
-        th1 = 0.0 if abs(c2) < 1e-9 else math.atan2(-d[1] / c2, -d[0] / c2)
-        s1, s2 = dh["signos"][0], dh["signos"][1]
-        cands = [(th1 * s1, th2 * s2), (wrap(th1 + math.pi) * s1, (math.pi - th2) * s2)]
-        if q_ref is None:
-            return cands[0]
-        return min(cands, key=lambda q: abs(wrap(q[0] - q_ref[0])) + abs(wrap(q[1] - q_ref[1])))
+        cerrada. (29-oct: la fórmula es de la cadena — CadenaFR5 / CadenaArctos.)"""
+        return self.c.q12_para_direccion(d_mundo, q_ref)
 
     def _elegir_lado_codo(self, lo, hi):
-        """Signo de joint3 con el que el antebrazo se dobla hacia ARRIBA (lado del bíceps) con el
-        brazo apuntando hacia delante-abajo."""
+        """Signo de joint3 (respecto al codo recto) con el que el antebrazo se dobla hacia ARRIBA
+        (lado del bíceps) con el brazo apuntando hacia delante-abajo."""
         d_ref = self.ejes @ np.array([0.3, -0.5, 0.8])
         q1, q2 = self.q12_para_direccion(d_ref)
         arriba = self.ejes[:, 1]
         mejor = {}
         for sg in (1, -1):
-            m = self.c.fk_marcos(np.array([q1, q2, sg * 1.2, 0.0, math.pi / 2, 0.0]))
-            fore = m[3][:3, 3] - m[2][:3, 3]
+            q = np.array(self.c.q_recto, dtype=float).copy()
+            q[0], q[1], q[2] = q1, q2, self.c.codo_recto + sg * 1.2
+            _, codo, _, fin = self.c.puntos_brazo(self.c.fk_marcos(q))
+            fore = fin - codo
             mejor[sg] = float(fore @ arriba) / np.linalg.norm(fore)
         return 1 if mejor[1] >= mejor[-1] else -1
 
@@ -276,14 +287,16 @@ class PosturaHumana:
         lo, hi = lo.copy(), hi.copy()
         flex = math.radians(p.codo_flex_max_deg)
         hip = math.radians(p.codo_hiperext_deg)
+        c0 = self.c.codo_recto                     # FR5: 0 · ARCTOS: ≈ 1,49 rad
+        n4, n5 = self.c.muneca_neutra              # FR5: (0, π/2) · ARCTOS: (0, 0)
         if self.codo_signo > 0:
-            lo[2], hi[2] = max(lo[2], -hip), min(hi[2], flex)
+            lo[2], hi[2] = max(lo[2], c0 - hip), min(hi[2], c0 + flex)
         else:
-            lo[2], hi[2] = max(lo[2], -flex), min(hi[2], hip)
+            lo[2], hi[2] = max(lo[2], c0 - flex), min(hi[2], c0 + hip)
         q4 = math.radians(p.muneca_q4_deg)
-        lo[3], hi[3] = max(lo[3], -q4), min(hi[3], q4)
+        lo[3], hi[3] = max(lo[3], n4 - q4), min(hi[3], n4 + q4)
         q5 = math.radians(p.muneca_q5_deg)
-        lo[4], hi[4] = max(lo[4], math.pi / 2 - q5), min(hi[4], math.pi / 2 + q5)
+        lo[4], hi[4] = max(lo[4], n5 - q5), min(hi[4], n5 + q5)
         if p.hombro_cono:
             # recorrer el cono humano (elevación 15°..165°, azimut permitido) y ver qué q1, q2 usa
             q1s, q2s = [], []
@@ -304,17 +317,18 @@ class PosturaHumana:
         """(válida, motivo) de la postura del robot según los criterios humanos."""
         p = self.par
         u = fk["codo"] - fk["hombro"]
-        f = fk["marcos"][3][:3, 3] - fk["codo"]           # antebrazo del FR5 (codo → joint4)
+        f = self.c.puntos_brazo(fk["marcos"])[3] - fk["codo"]    # antebrazo (FR5: codo → joint4)
         # codo: flexión y lado
         flex = math.degrees(math.acos(float(np.clip(u @ f / (np.linalg.norm(u) * np.linalg.norm(f)), -1, 1))))
         if flex > p.codo_flex_max_deg + 1e-6:
             return False, "codo>max"
-        if self.codo_signo * q[2] < -math.radians(p.codo_hiperext_deg):
+        if self.codo_signo * (q[2] - self.c.codo_recto) < -math.radians(p.codo_hiperext_deg):
             return False, "codo al reves"
         # muñeca
-        if abs(q[3]) > math.radians(p.muneca_q4_deg) + 1e-6:
+        n4, n5 = self.c.muneca_neutra
+        if abs(q[3] - n4) > math.radians(p.muneca_q4_deg) + 1e-6:
             return False, "muneca q4"
-        if abs(q[4] - math.pi / 2) > math.radians(p.muneca_q5_deg) + 1e-6:
+        if abs(q[4] - n5) > math.radians(p.muneca_q5_deg) + 1e-6:
             return False, "muneca q5"
         # hombro: cono
         if p.hombro_cono:
@@ -403,7 +417,7 @@ class ControlIKFR5:
         par = self.par
         q_prev = self.q
         R, p_w = obj["R_mano"], np.asarray(obj["p_muneca"], dtype=float)
-        T_tool = T_de(R, p_w - R @ OFFSET_MUNECA_ORCA)
+        T_tool = T_de(R, p_w - R @ self.c.off_muneca)
         sols = self.c.ik_analitica(T_tool, q_ref=q_prev, con_rama=True)
 
         # — transición en curso: seguir el camino planificado, actualizando el destino con la
@@ -485,7 +499,7 @@ class ControlIKFR5:
         self.rama = rama
         self.t_err = None
         self.info = dict(estado="exacta", error=0.0 if not limitado else
-                         float(np.linalg.norm(self.c.punto(q, OFFSET_MUNECA_ORCA) - p_w)),
+                         float(np.linalg.norm(self.c.punto(q, self.c.off_muneca) - p_w)),
                          rama=rama, n_sol=len(sols), n_validas=len(cands), descartes=descartes,
                          coste=coste, vel_limitada=limitado)
         return q, self.info
@@ -527,14 +541,14 @@ class ControlIKFR5:
             # ni siquiera la aproximación es válida (colisión al acercarse): retroceder un poco
             # hacia una postura segura = quedarse donde estamos
             q = q0
-            ep = float(np.linalg.norm(self.c.punto(q, OFFSET_MUNECA_ORCA) - p_w))
+            ep = float(np.linalg.norm(self.c.punto(q, self.c.off_muneca) - p_w))
             estado = "bloqueado"
         else:
             q, ep, _ = mejor
             estado = "aprox"
         if q_prev is not None:
             q, _ = self._limitar_velocidad(q, q_prev, dt, p_w)
-            ep = float(np.linalg.norm(self.c.punto(q, OFFSET_MUNECA_ORCA) - p_w))
+            ep = float(np.linalg.norm(self.c.punto(q, self.c.off_muneca) - p_w))
         # ¿atascado? (error alto un rato) → intentar otra rama relajando la continuidad
         if ep > par.error_atasco_m:
             if self.t_err is None:
@@ -567,7 +581,7 @@ class ControlIKFR5:
         lim_orig = c.limites
         c.limites = np.column_stack([self.lo, self.hi])
         try:
-            q, ep, eo = c.ik_numerica(q0, p_w, R, OFFSET_MUNECA_ORCA, w_pos=1.0, w_ori=w_ori,
+            q, ep, eo = c.ik_numerica(q0, p_w, R, c.off_muneca, w_pos=1.0, w_ori=w_ori,
                                       n_iter=40, eje_libre=eje_libre, paso_max=0.2)
         finally:
             c.limites = lim_orig
@@ -578,7 +592,7 @@ class ControlIKFR5:
         soluciones analíticas de una versión relajada del objetivo (muñeca en su sitio, mano con
         la orientación que más cerca quede) → si no hay, IK numérica desde varias semillas."""
         R = obj["R_mano"]
-        T_tool = T_de(R, p_w - R @ OFFSET_MUNECA_ORCA)
+        T_tool = T_de(R, p_w - R @ self.c.off_muneca)
         mejor = None
         for s, rama in self.c.ik_analitica(T_tool, q_ref=q_act, con_rama=True):
             ok, _ = self._valida(s)

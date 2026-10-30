@@ -626,6 +626,11 @@ class GuanteManus:
         self._n_paquetes, self._t_hz, self.hz = 0, time.perf_counter(), 0.0
         self._guantes = {}               # glove_id → (side, isHaptics)
         self._id_guante = None           # glove_id de nuestra mano (para vibrar)
+        # 29-oct (brazo izquierdo): la OTRA mano llega en el mismo callback del SDK; se guarda
+        # para ManoManusSecundaria (no se abre un segundo SDK)
+        self._id_otro = None
+        self._ang_otro = None
+        self._t_ang_otro = 0.0
         self._ctrl_suave = None          # comando que se escribe en el hilo de física
         # háptica v6: el hilo de física MIDE (escribir_ctrl), un hilo propio ENVÍA (_bucle_haptica)
         self._modelo = None              # lo da haptica() desde el bucle principal
@@ -762,29 +767,39 @@ class GuanteManus:
             guantes = {int(g.gloves[i].id): (int(g.gloves[i].side), bool(g.gloves[i].isHaptics))
                        for i in range(g.gloveCount)}
             lado = self._Side.Right if self.lado == "derecho" else self._Side.Left
+            otro = self._Side.Left if self.lado == "derecho" else self._Side.Right
             with self._lock:
                 self._guantes = guantes
                 self._id_guante = next((gid for gid, (s, _) in guantes.items() if s == lado), None)
+                self._id_otro = next((gid for gid, (s, _) in guantes.items() if s == otro), None)
         except Exception as e:
             self.error = f"landscape: {e}"
 
     def _cb_ergonomics(self, stream):
         try:
             base = 20 if self.lado == "derecho" else 0
-            elegido = None
+            base_otro = 20 - base
+            elegido = otro = None
             with self._lock:
-                id_nuestro = self._id_guante
+                id_nuestro, id_otro = self._id_guante, self._id_otro
             for i in range(stream.dataCount):
                 d = stream.data[i]
                 vals = [float(d.data[base + k]) for k in range(20)]
+                vals_o = [float(d.data[base_otro + k]) for k in range(20)]
                 if id_nuestro is not None and int(d.id) == id_nuestro:
                     elegido = vals
-                    break
-                if elegido is None and any(abs(v) > 1e-6 for v in vals):
+                elif elegido is None and id_nuestro is None and any(abs(v) > 1e-6 for v in vals):
                     elegido = vals                 # sin landscape aún: el que tenga datos
+                if id_otro is not None and int(d.id) == id_otro:
+                    otro = vals_o
+                elif otro is None and id_otro is None and any(abs(v) > 1e-6 for v in vals_o):
+                    otro = vals_o
+            ahora = time.perf_counter()
+            if otro is not None:
+                with self._lock:
+                    self._ang_otro, self._t_ang_otro = otro, ahora
             if elegido is None:
                 return
-            ahora = time.perf_counter()
             with self._lock:
                 self._ang, self._t_ang = elegido, ahora
                 self._n_paquetes += 1
@@ -805,6 +820,13 @@ class GuanteManus:
     def datos_frescos(self):
         _, edad = self.angulos()
         return edad <= MANUS_TIMEOUT_S
+
+    def angulos_otro(self):
+        """(20 ángulos en GRADOS, antigüedad en s) de la OTRA mano (29-oct), o (None, inf)."""
+        with self._lock:
+            if self._ang_otro is None:
+                return None, float("inf")
+            return list(self._ang_otro), time.perf_counter() - self._t_ang_otro
 
     def ctrl_objetivo(self):
         """ctrl de la mano (N_ACT, NaN en la muñeca) según el guante, 1:1, o None."""
@@ -988,6 +1010,66 @@ class GuanteManus:
                 self.vibrar(np.zeros(5))
             except Exception:
                 pass
+
+
+class ManoManusSecundaria:
+    """
+    La OTRA mano del MANUS (29-oct: la IZQUIERDA, para la OrcaHand del ARCTOS) sobre el MISMO
+    GuanteManus: el SDK solo se abre una vez y su callback ya trae las dos manos. Mismo mapeo
+    que la principal (angulos_a_ctrl) con su propia calibración (calibrar_manus.py --izquierda;
+    si no existe, la de la principal) y escribe sus dedos en ctrl[i0+1 .. i0+16].
+    Sin háptica (la OrcaHand izquierda solo existe en la simulación).
+    """
+
+    def __init__(self, principal: GuanteManus, i0, ruta_calibracion=None):
+        self.principal = principal
+        self.i0 = int(i0)                     # índice de ctrl del PRIMER actuador de esta mano (muñeca)
+        self.aplicar = False
+        self._ctrl_suave = None
+        ruta = ruta_calibracion
+        if ruta and os.path.exists(ruta):
+            self.mapeo = cargar_calibracion(ruta)
+            self.calibracion = os.path.basename(ruta)
+        else:
+            print("⚠️  [MANUS izq.] Sin calibración propia de la mano izquierda (python calibrar_manus.py "
+                  "--izquierda): uso la de la derecha.")
+            self.mapeo = principal.mapeo
+            self.calibracion = "la de la derecha"
+
+    def ctrl_objetivo(self):
+        ang, edad = self.principal.angulos_otro()
+        if ang is None or edad > MANUS_TIMEOUT_S:
+            return None
+        return angulos_a_ctrl(ang, self.mapeo)
+
+    def datos_frescos(self):
+        return self.principal.angulos_otro()[1] <= MANUS_TIMEOUT_S
+
+    def escribir_ctrl(self, datos, dt):
+        """Como GuanteManus.escribir_ctrl (hilo de física, antes de cada mj_step)."""
+        if not self.aplicar:
+            self._ctrl_suave = None
+            return
+        obj = self.ctrl_objetivo()
+        if obj is None:
+            return
+        i0 = self.i0
+        if self._ctrl_suave is None:
+            self._ctrl_suave = np.array(datos.ctrl[i0:i0 + N_ACT], dtype=float)
+        a = 1.0 - math.exp(-dt / MANUS_TAU_S) if MANUS_TAU_S > 0 else 1.0
+        m = ~np.isnan(obj)
+        self._ctrl_suave[m] += a * (obj[m] - self._ctrl_suave[m])
+        datos.ctrl[i0 + 1:i0 + N_ACT] = self._ctrl_suave[1:]
+
+    def estado_txt(self):
+        p = self.principal
+        if p._sdk is None:
+            return "MANUS izq.: sin SDK"
+        if not p.conectado:
+            return "MANUS izq.: conectando..."
+        if not self.datos_frescos():
+            return "MANUS izq.: SIN DATOS (¿guante izquierdo encendido?)"
+        return "MANUS izq.: OK" + ("" if self.aplicar else " (standby)")
 
 
 def _f_max_tactil():

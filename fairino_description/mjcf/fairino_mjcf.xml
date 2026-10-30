@@ -1,9 +1,14 @@
 <!--
-  FAIRINO FR5 + OrcaHand derecha + escena Elecnor. GENERADO por crear_fairino_mjcf.py
-  a partir de arctos_mjcf.xml: solo cambia el brazo. Si tocáis la escena o la mano en
-  arctos_mjcf.xml, volved a ejecutar el script.
+  FAIRINO FR5 + OrcaHand derecha (hombro DERECHO) + ARCTOS + OrcaHand izquierda (hombro
+  IZQUIERDO) + escena Elecnor. Generado en su día por crear_fairino_mjcf.py a partir de
+  arctos_mjcf.xml; el 29-oct se añadió a mano el ARCTOS en la placa libre del soporte.
+
+  ORDEN DE ACTUADORES (no cambiar: el código usa índices):
+     0..5   FR5 joint1..6                 6..22  OrcaHand DERECHA (17)
+    23..28  ARCTOS arctos_joint1..6       29..45 OrcaHand IZQUIERDA (17)
+  Así todo lo que ya usaba ctrl[0..22] (mano física, IA, demos, grabación) sigue igual.
 -->
-<mujoco model="fairino_fr5">
+<mujoco model="fairino_fr5_arctos">
   <compiler angle="radian" autolimits="true"/>
   <option gravity="0 0 -9.81" integrator="implicitfast"/>
 
@@ -105,6 +110,57 @@
     <mesh name="right_I-PP_Skin" file="../../orcahand_description-main/v2/models/assets/right/I-PP_Skin.stl" scale="0.001 0.001 0.001"/>
     <mesh name="right_M-IP_IP" file="../../orcahand_description-main/v2/models/assets/right/M-IP_IP.stl" scale="0.001 0.001 0.001"/>
     <mesh name="right_M-FingerTipAssembly_M-DP-Skin" file="../../orcahand_description-main/v2/models/assets/right/M-FingerTipAssembly_M-DP-Skin.stl" scale="0.001 0.001 0.001"/>
+
+
+    <!-- ── Mallas del ARCTOS (hombro IZQUIERDO). Copiadas de arctos_description-main/
+         arctos_urdf_description/meshes/ a fairino_description/meshes_arctos/ ── -->
+    <mesh name="arctos_base_link" file="../meshes_arctos/base_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_1_1" file="../meshes_arctos/Link_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_2_1" file="../meshes_arctos/Link_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_3_1" file="../meshes_arctos/Link_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_4_1" file="../meshes_arctos/Link_4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_5_1" file="../meshes_arctos/Link_5_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Link_6_1" file="../meshes_arctos/Link_6_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="arctos_Gripper_1" file="../meshes_arctos/Gripper_1.stl" scale="0.001 0.001 0.001"/>
+
+    <!-- ── Mallas de la OrcaHand IZQUIERDA (orcahand_left.mjcf, rutas recalculadas + escala explícita) ── -->
+    <mesh name="left_L-Carpals" file="../../orcahand_description-main/v2/models/assets/left/L-Carpals.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-Assembly" file="../../orcahand_description-main/v2/models/assets/left/P-Assembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_L-T-AP" file="../../orcahand_description-main/v2/models/assets/left/L-T-AP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-PP" file="../../orcahand_description-main/v2/models/assets/left/M-PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-L-Assembly" file="../../orcahand_description-main/v2/models/assets/left/I-L-Assembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-PP" file="../../orcahand_description-main/v2/models/assets/left/I-PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-AP" file="../../orcahand_description-main/v2/models/assets/left/P-AP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-AP-L" file="../../orcahand_description-main/v2/models/assets/left/I-AP-L.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-TP-L" file="../../orcahand_description-main/v2/models/assets/left/T-TP-L.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_ForeArmStructure-Model" file="../../orcahand_description-main/v2/models/assets/left/ForeArmStructure-Model.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-FingerTipAssembly" file="../../orcahand_description-main/v2/models/assets/left/P-FingerTipAssembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-DP" file="../../orcahand_description-main/v2/models/assets/left/T-DP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_TopTower-Model" file="../../orcahand_description-main/v2/models/assets/left/TopTower-Model.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-FingerTipAssembly" file="../../orcahand_description-main/v2/models/assets/left/I-FingerTipAssembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-PP" file="../../orcahand_description-main/v2/models/assets/left/T-PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-AP" file="../../orcahand_description-main/v2/models/assets/left/M-AP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-FingerTipAssembly" file="../../orcahand_description-main/v2/models/assets/left/M-FingerTipAssembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-PP" file="../../orcahand_description-main/v2/models/assets/left/P-PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_ForeArmStructure-Model_Logo" file="../../orcahand_description-main/v2/models/assets/left/ForeArmStructure-Model_Logo.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-L-Assembly" file="../../orcahand_description-main/v2/models/assets/left/T-L-Assembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-Assembly" file="../../orcahand_description-main/v2/models/assets/left/M-Assembly.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-PP_Skin" file="../../orcahand_description-main/v2/models/assets/left/T-PP_Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-IP_IP" file="../../orcahand_description-main/v2/models/assets/left/P-IP_IP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-PP_PP" file="../../orcahand_description-main/v2/models/assets/left/M-PP_PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-PP_Skin" file="../../orcahand_description-main/v2/models/assets/left/M-PP_Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-DP_Skin" file="../../orcahand_description-main/v2/models/assets/left/T-DP_Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-FingerTipAssembly_P-DP-Skin" file="../../orcahand_description-main/v2/models/assets/left/P-FingerTipAssembly_P-DP-Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-PP_PP" file="../../orcahand_description-main/v2/models/assets/left/T-PP_PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-IP_IP" file="../../orcahand_description-main/v2/models/assets/left/I-IP_IP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_T-DP_T-DP" file="../../orcahand_description-main/v2/models/assets/left/T-DP_T-DP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-PP_Skin" file="../../orcahand_description-main/v2/models/assets/left/P-PP_Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-PP_PP" file="../../orcahand_description-main/v2/models/assets/left/I-PP_PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-FingerTipAssembly_I-DP-Skin" file="../../orcahand_description-main/v2/models/assets/left/I-FingerTipAssembly_I-DP-Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_P-PP_PP" file="../../orcahand_description-main/v2/models/assets/left/P-PP_PP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_I-PP_Skin" file="../../orcahand_description-main/v2/models/assets/left/I-PP_Skin.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-IP_IP" file="../../orcahand_description-main/v2/models/assets/left/M-IP_IP.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_M-FingerTipAssembly_M-DP-Skin" file="../../orcahand_description-main/v2/models/assets/left/M-FingerTipAssembly_M-DP-Skin.stl" scale="0.001 0.001 0.001"/>
 
     <material name="azul_personalizado" rgba="0.0 0.278 0.6 1.0"/>
     <material name="naranja_personalizado" rgba="1.0 0.498 0.0 1.0"/>
@@ -247,6 +303,73 @@
         </body>
       </body>
     </body>
+
+    <!-- ══ BRAZO ARCTOS en la placa del HOMBRO IZQUIERDO (+X) del soporte (29-oct) ══════════
+         Misma cadena que arctos_mjcf.xml (eslabones, masas, ejes y rangos), con los nombres
+         prefijados (arctos_*) para no chocar con los del FR5. La pose de arctos_base_link la
+         ESCRIBE decoracion/crear_soporte_hombros.py: base apoyada en la placa (z = eje de
+         arctos_joint1 = normal de la placa, hacia fuera y abajo) y su +Y hacia atrás. Con todos
+         los joints a 0 el brazo sale a 45° hacia fuera-abajo y el antebrazo apunta al FRENTE.
+         Lleva la OrcaHand IZQUIERDA (espejo exacto de la derecha) en mano_mount_izq. -->
+    <body name="arctos_base_link" pos="0.410620887 0 0.264601551" quat="0.382683432 0 0.923879533 0">
+      <geom type="mesh" material="azul_personalizado" mesh="arctos_base_link" contype="0" conaffinity="0"/>
+      <body name="arctos_Link_1_1" pos="0 0.000529 0.111" gravcomp="1">
+        <inertial pos="0.00221889 -0.00486344 0.0854684" quat="0.684221 0.162893 0.0161784 0.710666"
+                  mass="0.8662" diaginertia="0.0062228 0.0051272 0.0046236"/>
+        <joint name="arctos_joint1" pos="0 0 0" axis="0 0 1" range="-3.14 3.14"/>
+        <geom pos="0 -0.000529 -0.111" type="mesh" material="azul_personalizado" mesh="arctos_Link_1_1"
+              contype="1" conaffinity="1"/>
+        <body name="arctos_Link_2_1" pos="-0.05713 -0.020885 0.178378" gravcomp="1">
+          <inertial pos="0.0553143 0.0108436 0.114124" quat="0.705835 -0.0180491 0.00517452 0.708127"
+                    mass="0.9632" diaginertia="0.012062 0.0107163 0.0036939"/>
+          <joint name="arctos_joint2" pos="0 0 0" axis="1 0 0" range="-2.5 2.5"/>
+          <geom pos="0.05713 0.020356 -0.289378" type="mesh" material="azul_personalizado" mesh="arctos_Link_2_1"
+                contype="1" conaffinity="1"/>
+          <body name="arctos_Link_3_1" pos="0.10013 0.001311 0.261007" gravcomp="1">
+            <inertial pos="-0.0417837 -0.0391303 0.0122176" quat="0.790559 0.5947 0.0870194 -0.117368"
+                      mass="0.30012" diaginertia="0.0010436 0.0010172 0.0005394"/>
+            <joint name="arctos_joint3" pos="0 0 0" axis="-1 0 0" range="-2.5 2.5"/>
+            <geom pos="-0.043 0.019045 -0.550385" type="mesh" material="azul_personalizado" mesh="arctos_Link_3_1"
+                  contype="1" conaffinity="1"/>
+            <body name="arctos_Link_4_1" pos="-0.042999 -0.139695 0.021705" gravcomp="1">
+              <inertial pos="0.00021105 -0.0602883 -0.000540823" quat="0.513594 0.486394 -0.519065 0.479806"
+                        mass="0.31544" diaginertia="0.001447 0.0009687 0.0009575"/>
+              <joint name="arctos_joint4" pos="0 0 0" axis="0 1 0" range="-3.14 3.14"/>
+              <geom pos="-1e-06 0.15874 -0.57209" type="mesh" material="azul_personalizado" mesh="arctos_Link_4_1"
+                    contype="1" conaffinity="1"/>
+              <body name="arctos_Link_5_1" pos="-0.039012 -0.121187 -0.001774" gravcomp="1">
+                <inertial pos="0.0397291 -0.0126624 0.000792919" quat="0.505014 0.466494 0.543912 0.481149"
+                          mass="0.069332" diaginertia="0.00007993 0.00007555 0.00006094"/>
+                <joint name="arctos_joint5" pos="0 0 0" axis="-1 0 0" range="-3.14 3.14"/>
+                <geom pos="0.039011 0.279927 -0.570316" type="mesh" material="naranja_personalizado" mesh="arctos_Link_5_1"
+                      contype="1" conaffinity="1"/>
+                <body name="arctos_Link_6_1" pos="0.039204 -0.033835 0" gravcomp="1">
+                  <inertial pos="0.0082086 -0.0134515 -0.000745211" quat="0.750608 -0.0167355 -0.00875287 0.660478"
+                            mass="0.05704" diaginertia="0.00005074 0.00003732 0.00002802"/>
+                  <joint name="arctos_joint6" pos="0 0 0" axis="0 1 0" range="-3.14 3.14"/>
+                  <geom pos="-0.000193 0.313762 -0.570316" type="mesh" material="azul_personalizado" mesh="arctos_Link_6_1"
+                        contype="1" conaffinity="1"/>
+                  <geom pos="-0.000193 0.313762 -0.570316" type="mesh" material="naranja_personalizado" mesh="arctos_Gripper_1"
+                        contype="1" conaffinity="1"/>
+                  <site name="flange_izq" pos="0 -0.05 0" size="0.006" rgba="1 0 0 1" group="4"/>
+                  <!-- ── OrcaHand IZQUIERDA. mano_mount_izq tiene los MISMOS ejes que tenía mano_mount
+                       en arctos_mjcf.xml (+Y = hacia los dedos, a lo largo del antebrazo); x = +0.01 en
+                       vez de -0.01 para que la articulación de su muñeca caiga sobre el eje de
+                       arctos_joint6. Dentro, la mano izquierda es el ESPEJO EXACTO de la derecha
+                       (plano de simetría índice↔meñique): en ejes de mano_mount_izq, dedos = +Y,
+                       palma hacia −X, índice→meñique = +Z (en la derecha, −Z). ── -->
+                  <body name="mano_mount_izq" pos="0.01 -0.1 0" euler="1.5708 1.5708 1.5708" childclass="mano" gravcomp="1">
+                    <body name="mano_izq_torre" pos="0 0 -0.02" quat="1 0 1 0">
+                      <include file="../../orcahand_description-main/v2/models/mjcf/orcahand_left_body_elecnor.xml"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
   </worldbody>
   <!-- Decoración corporativa Elecnor (solo visual: sin colisión, sin masa, sin bodies nuevos).
        Materiales primero (los usan también la mesa y el taladro) y luego el escenario base. -->
@@ -289,6 +412,33 @@
     <position name="right_t-abd_actuator" class="mano" joint="right_t-abd" ctrlrange="-0.3141592653589793 0.9599310885968813"/>
     <position name="right_t-mcp_actuator" class="mano" joint="right_t-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
     <position name="right_t-pip_actuator" class="mano" joint="right_t-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
+
+    <!-- ── ARCTOS (hombro izquierdo): ctrl[23..28]. Ganancias de arctos_mjcf.xml ── -->
+    <position name="act_arctos_joint1" joint="arctos_joint1" kp="500" dampratio="1.0" ctrlrange="-3.14 3.14"/>
+    <position name="act_arctos_joint2" joint="arctos_joint2" kp="500" dampratio="1.0" ctrlrange="-2.5 2.5"/>
+    <position name="act_arctos_joint3" joint="arctos_joint3" kp="300" dampratio="1.0" ctrlrange="-2.5 2.5"/>
+    <position name="act_arctos_joint4" joint="arctos_joint4" kp="300" dampratio="1.0" ctrlrange="-3.14 3.14"/>
+    <position name="act_arctos_joint5" joint="arctos_joint5" kp="200" dampratio="1.0" ctrlrange="-3.14 3.14"/>
+    <position name="act_arctos_joint6" joint="arctos_joint6" kp="150" dampratio="1.0" ctrlrange="-3.14 3.14"/>
+
+    <!-- ── OrcaHand IZQUIERDA: ctrl[29..45], mismo orden que la derecha (muñeca, meñique...) ── -->
+    <position name="left_wrist_actuator" class="mano" joint="left_wrist" ctrlrange="-1.1344640137963142 0.6108652381980153"/>
+    <position name="left_p-abd_actuator" class="mano" joint="left_p-abd" ctrlrange="-0.5235987755982988 0.5235987755982988"/>
+    <position name="left_p-mcp_actuator" class="mano" joint="left_p-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
+    <position name="left_p-pip_actuator" class="mano" joint="left_p-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
+    <position name="left_r-abd_actuator" class="mano" joint="left_r-abd" ctrlrange="-0.47123889803846897 0.47123889803846897"/>
+    <position name="left_r-mcp_actuator" class="mano" joint="left_r-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
+    <position name="left_r-pip_actuator" class="mano" joint="left_r-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
+    <position name="left_m-abd_actuator" class="mano" joint="left_m-abd" ctrlrange="-0.47123889803846897 0.47123889803846897"/>
+    <position name="left_m-mcp_actuator" class="mano" joint="left_m-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
+    <position name="left_m-pip_actuator" class="mano" joint="left_m-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
+    <position name="left_i-abd_actuator" class="mano" joint="left_i-abd" ctrlrange="-0.436332313 0.5235987756"/>
+    <position name="left_i-mcp_actuator" class="mano" joint="left_i-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
+    <position name="left_i-pip_actuator" class="mano" joint="left_i-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
+    <position name="left_t-cmc_actuator" class="mano" joint="left_t-cmc" ctrlrange="-0.7853981633974483 0.5759586531581288"/>
+    <position name="left_t-abd_actuator" class="mano" joint="left_t-abd" ctrlrange="-0.3141592653589793 0.9599310885968813"/>
+    <position name="left_t-mcp_actuator" class="mano" joint="left_t-mcp" ctrlrange="-0.4363323129985824 1.7453292519943295"/>
+    <position name="left_t-pip_actuator" class="mano" joint="left_t-pip" ctrlrange="-0.2617993877991494 1.8675022996339325"/>
   </actuator>
 
   <contact>
@@ -361,5 +511,75 @@
     <exclude body1="right_T-TP-R_1c2b802d" body2="right_T-DP_b7429e50"/>
     <exclude body1="right_R-T-AP_a9723101" body2="right_T-DP_b7429e50"/>
     <exclude body1="right_T-PP_68395e98" body2="right_T-DP_b7429e50"/>
+    <!-- ── OrcaHand IZQUIERDA (copiadas de orcahand_left.mjcf) ── -->
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_TopTower-Model_4a80d30e"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_L-Carpals_719fff8c"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_L-Carpals_719fff8c"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_P-AP_f5e42b61"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_P-AP_f5e42b61"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_P-AP_f5e42b61"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_P-PP_1d411b9b"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_P-PP_1d411b9b"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_P-PP_1d411b9b"/>
+    <exclude body1="left_P-AP_f5e42b61" body2="left_P-PP_1d411b9b"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_P-FingerTipAssembly_cd219176"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_P-FingerTipAssembly_cd219176"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_P-FingerTipAssembly_cd219176"/>
+    <exclude body1="left_P-AP_f5e42b61" body2="left_P-FingerTipAssembly_cd219176"/>
+    <exclude body1="left_P-PP_1d411b9b" body2="left_P-FingerTipAssembly_cd219176"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-AP_6ec59111"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-AP_6ec59111"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-AP_6ec59111"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-PP_8660a1eb"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-PP_8660a1eb"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-PP_8660a1eb"/>
+    <exclude body1="left_M-AP_6ec59111" body2="left_M-PP_8660a1eb"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-FingerTipAssembly_424a8e75"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-FingerTipAssembly_424a8e75"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-FingerTipAssembly_424a8e75"/>
+    <exclude body1="left_M-AP_6ec59111" body2="left_M-FingerTipAssembly_424a8e75"/>
+    <exclude body1="left_M-PP_8660a1eb" body2="left_M-FingerTipAssembly_424a8e75"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-AP_e04a96f2"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-AP_e04a96f2"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-AP_e04a96f2"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-PP_08efa608"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-PP_08efa608"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-PP_08efa608"/>
+    <exclude body1="left_M-AP_e04a96f2" body2="left_M-PP_08efa608"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_M-FingerTipAssembly_34afb748"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_M-FingerTipAssembly_34afb748"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_M-FingerTipAssembly_34afb748"/>
+    <exclude body1="left_M-AP_e04a96f2" body2="left_M-FingerTipAssembly_34afb748"/>
+    <exclude body1="left_M-PP_08efa608" body2="left_M-FingerTipAssembly_34afb748"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_I-AP-L_57ce92f7"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_I-AP-L_57ce92f7"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_I-AP-L_57ce92f7"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_I-PP_3df4f91d"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_I-PP_3df4f91d"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_I-PP_3df4f91d"/>
+    <exclude body1="left_I-AP-L_57ce92f7" body2="left_I-PP_3df4f91d"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_I-FingerTipAssembly_ed91b18a"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_I-FingerTipAssembly_ed91b18a"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_I-FingerTipAssembly_ed91b18a"/>
+    <exclude body1="left_I-AP-L_57ce92f7" body2="left_I-FingerTipAssembly_ed91b18a"/>
+    <exclude body1="left_I-PP_3df4f91d" body2="left_I-FingerTipAssembly_ed91b18a"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_T-TP-L_92b8100b"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_T-TP-L_92b8100b"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_T-TP-L_92b8100b"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_L-T-AP_58680c44"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_L-T-AP_58680c44"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_L-T-AP_58680c44"/>
+    <exclude body1="left_T-TP-L_92b8100b" body2="left_L-T-AP_58680c44"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_T-PP_ef067304"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_T-PP_ef067304"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_T-PP_ef067304"/>
+    <exclude body1="left_T-TP-L_92b8100b" body2="left_T-PP_ef067304"/>
+    <exclude body1="left_L-T-AP_58680c44" body2="left_T-PP_ef067304"/>
+    <exclude body1="left_ForeArmStructure-Model_e18f2368" body2="left_T-DP_307db3cc"/>
+    <exclude body1="left_TopTower-Model_4a80d30e" body2="left_T-DP_307db3cc"/>
+    <exclude body1="left_L-Carpals_719fff8c" body2="left_T-DP_307db3cc"/>
+    <exclude body1="left_T-TP-L_92b8100b" body2="left_T-DP_307db3cc"/>
+    <exclude body1="left_L-T-AP_58680c44" body2="left_T-DP_307db3cc"/>
+    <exclude body1="left_T-PP_ef067304" body2="left_T-DP_307db3cc"/>
   </contact>
 </mujoco>
